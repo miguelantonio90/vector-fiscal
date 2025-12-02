@@ -292,7 +292,11 @@ const handleUserUpdated = (event) => {
 }
 
 onMounted(() => {
-  if (!route.meta.public) {
+  // Solo cargar datos si hay token y no estamos en ruta pública
+  const token = localStorage.getItem('token')
+  const isPublic = route.meta?.public === true
+  
+  if (token && !isPublic) {
     loadUser()
     loadPendingObligations()
   }
@@ -305,11 +309,14 @@ onUnmounted(() => {
 
 // Recargar usuario cuando cambie la ruta (por si acaba de hacer login)
 watch(() => route.path, (newPath) => {
-  if (!route.meta.public && !user.value) {
+  const token = localStorage.getItem('token')
+  const isPublic = route.meta?.public === true
+  
+  if (token && !isPublic && !user.value) {
     loadUser()
   }
   // Recargar obligaciones pendientes al cambiar de página
-  if (!route.meta.public) {
+  if (token && !isPublic) {
     loadPendingObligations()
   }
 })

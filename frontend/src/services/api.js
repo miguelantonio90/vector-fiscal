@@ -27,9 +27,13 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Token inválido o expirado - limpiar y redirigir a login
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      window.location.href = '/login'
+      // Solo redirigir si NO estamos ya en una ruta pública (login/register)
+      const isPublicRoute = window.location.pathname === '/login' || window.location.pathname === '/register'
+      if (!isPublicRoute) {
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }
