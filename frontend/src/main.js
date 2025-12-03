@@ -13,6 +13,8 @@ import Reports from './views/Reports.vue'
 import Profile from './views/Profile.vue'
 import Login from './views/Login.vue'
 import Register from './views/Register.vue'
+import Users from './views/Users.vue'
+import CashFlow from './views/CashFlow.vue'
 
 const routes = [
   { path: '/login', name: 'Login', component: Login, meta: { public: true } },
@@ -22,8 +24,10 @@ const routes = [
   { path: '/calculadora', name: 'Calculator', component: Calculator },
   { path: '/pagos', name: 'Payments', component: Payments },
   { path: '/ingresos', name: 'Incomes', component: Incomes },
+  { path: '/flujo-caja', name: 'CashFlow', component: CashFlow },
   { path: '/reportes', name: 'Reports', component: Reports },
-  { path: '/perfil', name: 'Profile', component: Profile }
+  { path: '/perfil', name: 'Profile', component: Profile },
+  { path: '/usuarios', name: 'Users', component: Users, meta: { adminOnly: true } }
 ]
 
 const router = createRouter({
@@ -35,6 +39,7 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
   const isPublicRoute = to.meta.public
+  const isAdminRoute = to.meta.adminOnly
   
   if (!token && !isPublicRoute) {
     // No hay token y la ruta no es pública - redirigir a login
@@ -42,6 +47,18 @@ router.beforeEach((to, from, next) => {
   } else if (token && isPublicRoute) {
     // Hay token y está intentando acceder a login/register - redirigir a dashboard
     next('/')
+  } else if (isAdminRoute) {
+    // Verificar si el usuario es admin
+    const user = localStorage.getItem('user')
+    if (user) {
+      const userData = JSON.parse(user)
+      if (userData.role !== 'admin') {
+        // No es admin - redirigir a dashboard
+        next('/')
+        return
+      }
+    }
+    next()
   } else {
     next()
   }

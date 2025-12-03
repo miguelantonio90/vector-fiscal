@@ -225,6 +225,26 @@
           </div>
         </div>
 
+        <!-- AI Insights Panel -->
+        <div class="card">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                <span class="text-xl">🔮</span>
+              </div>
+              <h3 class="text-lg font-display font-bold text-white">Insights IA</h3>
+            </div>
+            <router-link to="/flujo-caja" class="text-xs text-purple-400 hover:text-purple-300">
+              Ver análisis →
+            </router-link>
+          </div>
+          <InsightsPanel 
+            :insights="insights" 
+            :loading="insightsLoading"
+            @action="handleInsightAction"
+          />
+        </div>
+
         <!-- Bonuses Info -->
         <div class="card bg-gradient-to-br from-emerald-900/30 to-slate-800/50 border-emerald-700/30">
           <div class="flex items-center gap-3 mb-4">
@@ -285,7 +305,8 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { obligationsApi, paymentsApi } from '../services/api'
+import { obligationsApi, paymentsApi, predictionsApi } from '../services/api'
+import InsightsPanel from '../components/InsightsPanel.vue'
 
 const loading = ref(true)
 const importing = ref(false)
@@ -293,6 +314,8 @@ const allObligations = ref([])
 const summary = ref({ pending: 0, paid: 0, overdue: 0, total: 0, totalAmount: 0, paidAmount: 0 })
 const paymentsSummary = ref({ totalPaid: 0, totalBonus: 0, totalPayments: 0 })
 const toast = ref({ show: false, message: '', type: 'success' })
+const insights = ref([])
+const insightsLoading = ref(true)
 
 const pendingObligations = computed(() => {
   return allObligations.value
@@ -394,6 +417,29 @@ async function loadData() {
   }
 }
 
+async function loadInsights() {
+  insightsLoading.value = true
+  try {
+    const response = await predictionsApi.getInsights()
+    insights.value = response.data.insights || []
+  } catch (error) {
+    console.error('Error loading insights:', error)
+    insights.value = []
+  } finally {
+    insightsLoading.value = false
+  }
+}
+
+function handleInsightAction(insight) {
+  if (insight.id === 'next-payment') {
+    // Redirigir a pagos
+    window.location.href = '/pagos'
+  } else if (insight.id === 'heavy-month-alert') {
+    // Redirigir a flujo de caja
+    window.location.href = '/flujo-caja'
+  }
+}
+
 async function importObligations() {
   importing.value = true
   try {
@@ -409,5 +455,6 @@ async function importObligations() {
 
 onMounted(() => {
   loadData()
+  loadInsights()
 })
 </script>

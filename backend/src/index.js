@@ -27,6 +27,10 @@ app.use('/api/payments', auth, require('./routes/payments'));
 app.use('/api/incomes', auth, require('./routes/incomes'));
 app.use('/api/calculator', auth, require('./routes/calculator'));
 app.use('/api/alerts', auth, require('./routes/alerts'));
+app.use('/api/predictions', auth, require('./routes/predictions'));
+
+// Rutas de administración (requieren autenticación + rol admin)
+app.use('/api/users', require('./routes/users'));
 
 const PORT = process.env.PORT || 3000;
 

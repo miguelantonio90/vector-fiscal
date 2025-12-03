@@ -107,4 +107,35 @@ export const alertsApi = {
   delete: (id) => api.delete(`/alerts/${id}`)
 }
 
+// Users API (Admin only)
+export const usersApi = {
+  getAll: (params = {}) => api.get('/users', { params }),
+  getById: (id) => api.get(`/users/${id}`),
+  create: (data) => api.post('/users', data),
+  update: (id, data) => api.put(`/users/${id}`, data),
+  delete: (id) => api.delete(`/users/${id}`),
+  getStats: () => api.get('/users/stats')
+}
+
+// Predictions API (AI/Estimaciones)
+export const predictionsApi = {
+  // Predicción de ingresos futuros
+  predictIncome: (months = 3) => api.get('/predictions/income', { params: { months } }),
+  
+  // Estimación de impuestos futuros
+  estimateTaxes: (months = 3) => api.get('/predictions/taxes', { params: { months } }),
+  
+  // Análisis de flujo de caja
+  getCashFlow: (year = new Date().getFullYear()) => api.get('/predictions/cashflow', { params: { year } }),
+  
+  // Insights para el dashboard
+  getInsights: () => api.get('/predictions/insights'),
+  
+  // Calcular impuestos para un ingreso específico
+  calculate: (income, includeBonus = true) => api.post('/predictions/calculate', { income, includeBonus }),
+  
+  // Resumen completo de predicciones
+  getSummary: (year = new Date().getFullYear()) => api.get('/predictions/summary', { params: { year } })
+}
+
 export default api
