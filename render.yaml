@@ -25,7 +25,7 @@ services:
 
   # Frontend (servido como web service)
   - type: web
-    name: mionat
+    name: mionat-web
     env: node
     region: oregon
     plan: free
