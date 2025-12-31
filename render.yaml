@@ -23,9 +23,9 @@ services:
       - key: FRONTEND_URL
         value: https://mionat.onrender.com
 
-  # Frontend (Static Site)
-  - type: static
-    name: mionat
+# Frontend (Static Site) - sección separada
+staticSites:
+  - name: mionat
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: frontend/dist
     headers:
@@ -39,4 +39,3 @@ services:
     envVars:
       - key: VITE_API_URL
         value: https://mionat-api.onrender.com/api
-
