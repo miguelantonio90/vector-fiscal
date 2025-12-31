@@ -23,18 +23,14 @@ services:
       - key: FRONTEND_URL
         value: https://mionat.onrender.com
 
-staticSites:
-  - name: mionat
-    buildCommand: cd frontend && npm install && npm run build
-    publishPath: frontend/dist
+  # Frontend (servido como web service)
+  - type: web
+    name: mionat
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: cd frontend && npm install && npm run build && npm install -g serve
+    startCommand: cd frontend && serve -s dist -l $PORT
     envVars:
       - key: VITE_API_URL
         value: https://mionat-api.onrender.com/api
-    headers:
-      - path: /*
-        name: Cache-Control
-        value: no-cache, no-store, must-revalidate
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
