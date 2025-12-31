@@ -44,6 +44,7 @@ api.interceptors.response.use(
 
 // Auth API
 export const authApi = {
+  register: (data) => api.post('/auth/register', data),
   login: (nit, password) => api.post('/auth/login', { nit, password }),
   me: () => api.get('/auth/me'),
   updateProfile: (name, nit) => api.put('/auth/profile', { name, nit }),

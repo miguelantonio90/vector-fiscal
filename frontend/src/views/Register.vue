@@ -135,7 +135,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import { authApi } from '../services/api'
 
 const router = useRouter()
 
@@ -152,7 +152,7 @@ const handleRegister = async () => {
   
   try {
     // Crear usuario (sin autenticación)
-    await axios.post('/api/auth/register', {
+    await authApi.register({
       name: name.value,
       nit: nit.value,
       password: nit.value // El NIT es la contraseña
