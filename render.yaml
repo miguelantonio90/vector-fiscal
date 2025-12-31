@@ -21,7 +21,7 @@ services:
       - key: MONGODB_URI
         sync: false
       - key: FRONTEND_URL
-        value: https://mionat.onrender.com
+        value: https://mionat-web.onrender.com
 
   # Frontend (servido como web service)
   - type: web
