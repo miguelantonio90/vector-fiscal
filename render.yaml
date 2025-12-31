@@ -1,0 +1,45 @@
+# render.yaml - Configuración para deploy automático en Render
+# https://render.com/docs/blueprint-spec
+
+services:
+  # Backend API (Node.js)
+  - type: web
+    name: mionat-api
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 30d
+      - key: MONGODB_URI
+        sync: false  # Se configurará manualmente con MongoDB Atlas
+      - key: FRONTEND_URL
+        value: https://mionat.onrender.com
+
+  # Frontend (Static Site)
+  - type: web
+    name: mionat
+    env: static
+    region: oregon
+    plan: free
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/dist
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        value: https://mionat-api.onrender.com/api
+

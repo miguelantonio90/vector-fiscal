@@ -219,6 +219,80 @@ Authorization: Bearer <token>
 - Indicadores de urgencia por color
 - Enlace rápido al calendario
 
+## 🚀 Deploy en Producción (Render + MongoDB Atlas)
+
+### Paso 1: Crear base de datos en MongoDB Atlas (Gratis)
+
+1. Ve a [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) y crea una cuenta
+2. Crea un nuevo cluster gratuito (M0 Sandbox)
+3. En "Database Access", crea un usuario con contraseña
+4. En "Network Access", agrega `0.0.0.0/0` para permitir conexiones desde cualquier IP
+5. En "Connect", selecciona "Connect your application" y copia la URI:
+   ```
+   mongodb+srv://usuario:password@cluster.xxxxx.mongodb.net/mionat?retryWrites=true&w=majority
+   ```
+
+### Paso 2: Deploy en Render (Gratis)
+
+#### Opción A: Deploy automático con Blueprint
+
+1. Haz fork de este repositorio en GitHub
+2. Ve a [Render Dashboard](https://dashboard.render.com)
+3. Click en "New" → "Blueprint"
+4. Conecta tu repositorio de GitHub
+5. Render detectará el archivo `render.yaml` y creará los servicios automáticamente
+6. Configura la variable `MONGODB_URI` con tu URI de Atlas
+
+#### Opción B: Deploy manual
+
+**Backend (Web Service):**
+1. New → Web Service
+2. Conecta tu repositorio
+3. Configuración:
+   - Name: `mionat-api`
+   - Root Directory: `backend`
+   - Build Command: `npm install`
+   - Start Command: `npm start`
+   - Plan: Free
+4. Variables de entorno:
+   ```
+   NODE_ENV=production
+   MONGODB_URI=mongodb+srv://...tu-uri-de-atlas...
+   JWT_SECRET=una-clave-secreta-muy-larga-y-segura
+   JWT_EXPIRES_IN=30d
+   FRONTEND_URL=https://mionat.onrender.com
+   ```
+
+**Frontend (Static Site):**
+1. New → Static Site
+2. Conecta tu repositorio
+3. Configuración:
+   - Name: `mionat`
+   - Root Directory: `frontend`
+   - Build Command: `npm install && npm run build`
+   - Publish Directory: `dist`
+4. Variables de entorno:
+   ```
+   VITE_API_URL=https://mionat-api.onrender.com/api
+   ```
+5. En "Redirects/Rewrites", agrega:
+   - Source: `/*`
+   - Destination: `/index.html`
+   - Action: Rewrite
+
+### URLs de producción
+
+Una vez desplegado, tu app estará disponible en:
+- **Frontend**: https://mionat.onrender.com
+- **Backend API**: https://mionat-api.onrender.com/api
+- **Health Check**: https://mionat-api.onrender.com/api/health
+
+### ⚠️ Notas importantes
+
+- Los servicios gratuitos de Render se "duermen" después de 15 minutos de inactividad
+- El primer request después de inactividad puede tardar 30-60 segundos
+- MongoDB Atlas gratis tiene límite de 512MB de almacenamiento
+
 ## 📄 Licencia
 
 Proyecto de uso personal desarrollado para la gestión tributaria en Cuba.

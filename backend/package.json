@@ -4,8 +4,12 @@
   "description": "Backend API para MiONAT - Gestión Tributaria ONAT 2025",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "start": "NODE_ENV=production node src/index.js",
+    "dev": "nodemon src/index.js",
+    "build": "echo 'No build step required for backend'"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
