@@ -136,7 +136,7 @@
             <h3 class="text-lg font-display font-bold text-white">Obligaciones Pendientes</h3>
             <p class="text-sm text-slate-400">Próximos pagos a realizar</p>
           </div>
-          <router-link to="/calendario" class="text-onat-red hover:text-onat-accent text-sm font-medium flex items-center gap-1">
+          <router-link to="/calendar" class="text-onat-red hover:text-onat-accent text-sm font-medium flex items-center gap-1">
             Ver calendario
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
@@ -189,7 +189,7 @@
               </p>
             </div>
             <router-link 
-              :to="`/pagos?obligationId=${obligation._id}`"
+              :to="`/payments?obligationId=${obligation._id}`"
               class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
             >
               Pagar
@@ -204,19 +204,19 @@
         <div class="card">
           <h3 class="text-lg font-display font-bold text-white mb-4">Acciones Rápidas</h3>
           <div class="space-y-3">
-            <router-link to="/pagos" class="w-full btn bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-2">
+            <router-link to="/payments" class="w-full btn bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-2">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
               Registrar Pago
             </router-link>
-            <router-link to="/calculadora" class="w-full btn btn-secondary flex items-center justify-center gap-2">
+            <router-link to="/calculator" class="w-full btn btn-secondary flex items-center justify-center gap-2">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
               </svg>
               Calculadora
             </router-link>
-            <router-link to="/reportes" class="w-full btn btn-secondary flex items-center justify-center gap-2">
+            <router-link to="/reports" class="w-full btn btn-secondary flex items-center justify-center gap-2">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
@@ -234,7 +234,7 @@
               </div>
               <h3 class="text-lg font-display font-bold text-white">Insights IA</h3>
             </div>
-            <router-link to="/flujo-caja" class="text-xs text-purple-400 hover:text-purple-300">
+            <router-link to="/cash-flow" class="text-xs text-purple-400 hover:text-purple-300">
               Ver análisis →
             </router-link>
           </div>
@@ -433,10 +433,10 @@ async function loadInsights() {
 function handleInsightAction(insight) {
   if (insight.id === 'next-payment') {
     // Redirigir a pagos
-    window.location.href = '/pagos'
+    window.location.href = '/payments'
   } else if (insight.id === 'heavy-month-alert') {
     // Redirigir a flujo de caja
-    window.location.href = '/flujo-caja'
+    window.location.href = '/cash-flow'
   }
 }
 
@@ -444,7 +444,7 @@ async function importObligations() {
   importing.value = true
   try {
     const res = await obligationsApi.importVectorFiscal()
-    showToast(`Vector Fiscal importado: ${res.data.total} obligaciones`, 'success')
+    showToast(`MiONAT importado: ${res.data.total} obligaciones`, 'success')
     await loadData()
   } catch (error) {
     showToast('Error al importar: ' + error.message, 'error')

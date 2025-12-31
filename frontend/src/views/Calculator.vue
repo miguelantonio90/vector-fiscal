@@ -147,7 +147,7 @@
                 <span class="text-slate-300 font-mono">{{ formatCurrency(result.taxes.incomeAdvance.excess) }}</span>
               </div>
               <div class="flex justify-between items-center">
-                <span class="text-slate-400 text-sm">5% sobre el exceso</span>
+                <span class="text-slate-400 text-sm">3% sobre el exceso</span>
                 <span class="text-orange-400 font-mono font-bold text-lg">{{ formatCurrency(result.taxes.incomeAdvance.amount) }}</span>
               </div>
             </div>
@@ -216,7 +216,7 @@
               <span class="text-white font-medium">Aporte a cuenta Imp. Ingresos Personales</span>
             </div>
             <p class="text-slate-400 text-sm">
-              <strong class="text-orange-400">5%</strong> sobre ingresos que excedan 
+              <strong class="text-orange-400">3%</strong> sobre ingresos que excedan 
               <strong class="text-emerald-400">{{ formatCurrency(3260) }}</strong> mensuales (mínimo exento).
               Solo aplica si superas este monto.
             </p>

@@ -159,7 +159,7 @@
               
               <div v-if="payment.bonusApplied > 0" class="text-center">
                 <div class="px-3 py-1.5 bg-emerald-500/20 rounded-lg">
-                  <span class="text-emerald-400 font-mono font-semibold text-sm">-{{ payment.bonusApplied.toFixed(1) }}%</span>
+                  <span class="text-emerald-400 font-mono font-semibold text-sm">-{{ Math.round(payment.bonusApplied) }}%</span>
                 </div>
               </div>
             </div>

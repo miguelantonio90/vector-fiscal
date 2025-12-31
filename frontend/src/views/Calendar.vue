@@ -167,7 +167,7 @@
         <div class="mt-6 flex gap-3">
           <router-link 
             v-if="selectedObligation.status !== 'pagado'"
-            :to="`/pagos?obligationId=${selectedObligation._id}`"
+            :to="`/payments?obligationId=${selectedObligation._id}`"
             class="flex-1 btn btn-success text-center"
           >
             Registrar Pago

@@ -145,7 +145,7 @@
                   </span>
                 </td>
                 <td class="py-2 px-2 text-right text-emerald-400 print:text-green-700">
-                  {{ payment.bonusApplied > 0 ? `-${payment.bonusApplied}%` : '-' }}
+                  {{ payment.bonusApplied > 0 ? `-${Math.round(payment.bonusApplied)}%` : '-' }}
                 </td>
                 <td class="py-2 px-2 text-right font-mono text-white print:text-black font-medium">
                   {{ formatCurrencyPrint(payment.amount) }}
@@ -237,10 +237,218 @@
         </div>
       </div>
 
+      <!-- Declaración Jurada Anual (DJ-08) -->
+      <div v-if="declaration" class="card print:shadow-none print:border print:border-gray-300 print:rounded-none print:bg-white mt-6 print:mt-4 print:break-before-page">
+        <h3 class="text-lg font-display font-bold text-white print:text-black mb-4 print:border-b print:border-gray-300 print:pb-2 flex items-center gap-2">
+          <span class="text-xl print:hidden">📋</span>
+          DECLARACIÓN JURADA ANUAL (DJ-08) - {{ selectedYear }}
+        </h3>
+        
+        <!-- Status Banner -->
+        <div 
+          class="rounded-lg p-4 mb-4 print:border print:rounded-none"
+          :class="{
+            'bg-emerald-500/10 border border-emerald-500/30 print:bg-green-50 print:border-green-300': declaration.result.status === 'SALDADO',
+            'bg-amber-500/10 border border-amber-500/30 print:bg-amber-50 print:border-amber-300': declaration.result.status === 'A FAVOR',
+            'bg-red-500/10 border border-red-500/30 print:bg-red-50 print:border-red-300': declaration.result.status === 'A PAGAR'
+          }"
+        >
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl print:hidden">
+                {{ declaration.result.status === 'SALDADO' ? '✅' : declaration.result.status === 'A FAVOR' ? '🎉' : '⚠️' }}
+              </span>
+              <div>
+                <p class="font-bold text-lg" :class="{
+                  'text-emerald-400 print:text-green-700': declaration.result.status === 'SALDADO',
+                  'text-amber-400 print:text-amber-700': declaration.result.status === 'A FAVOR',
+                  'text-red-400 print:text-red-700': declaration.result.status === 'A PAGAR'
+                }">
+                  {{ declaration.result.status === 'SALDADO' ? 'SIN DEUDAS' : declaration.result.status }}
+                </p>
+                <p class="text-sm text-slate-400 print:text-gray-600">{{ declaration.result.message }}</p>
+              </div>
+            </div>
+            <div class="text-right">
+              <p class="text-xs text-slate-400 print:text-gray-500">Fecha límite</p>
+              <p class="font-mono font-semibold text-white print:text-black">{{ declaration.status.deadline }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- DJ Summary Grid -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 print:grid-cols-4">
+          <div class="p-3 bg-slate-700/30 rounded-lg print:bg-gray-50 print:border print:border-gray-200 text-center">
+            <p class="text-xs text-slate-400 print:text-gray-500">Ingresos Anuales</p>
+            <p class="text-lg font-bold text-white print:text-black font-mono">{{ formatCurrencyPrint(declaration.incomes.total) }}</p>
+          </div>
+          <div class="p-3 bg-slate-700/30 rounded-lg print:bg-gray-50 print:border print:border-gray-200 text-center">
+            <p class="text-xs text-slate-400 print:text-gray-500">Base Imponible</p>
+            <p class="text-lg font-bold text-white print:text-black font-mono">{{ formatCurrencyPrint(declaration.calculation.taxableBase) }}</p>
+          </div>
+          <div class="p-3 bg-slate-700/30 rounded-lg print:bg-gray-50 print:border print:border-gray-200 text-center">
+            <p class="text-xs text-slate-400 print:text-gray-500">Impuesto Anual</p>
+            <p class="text-lg font-bold text-white print:text-black font-mono">{{ formatCurrencyPrint(declaration.calculation.grossTax) }}</p>
+          </div>
+          <div class="p-3 bg-slate-700/30 rounded-lg print:bg-gray-50 print:border print:border-gray-200 text-center">
+            <p class="text-xs text-slate-400 print:text-gray-500">Aportes Pagados</p>
+            <p class="text-lg font-bold text-emerald-400 print:text-green-700 font-mono">{{ formatCurrencyPrint(declaration.result.advancesPaid) }}</p>
+          </div>
+        </div>
+
+        <!-- Ingresos por Mes -->
+        <div class="mb-6">
+          <h4 class="text-sm font-semibold text-slate-300 print:text-gray-700 mb-3">Ingresos Mensuales</h4>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-slate-700/50 print:border-gray-300">
+                  <th v-for="month in declaration.incomes.monthly" :key="month.month" class="py-2 px-1 text-center text-slate-400 print:text-gray-600 font-medium text-xs">
+                    {{ month.monthName.slice(0, 3) }}
+                  </th>
+                  <th class="py-2 px-2 text-center text-slate-400 print:text-gray-600 font-medium text-xs bg-slate-700/30 print:bg-gray-100">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td v-for="month in declaration.incomes.monthly" :key="month.month" class="py-2 px-1 text-center font-mono text-xs" :class="month.hasData ? 'text-emerald-400 print:text-green-700' : 'text-slate-500 print:text-gray-400'">
+                    {{ month.hasData ? formatCurrencyPrint(month.amount) : '-' }}
+                  </td>
+                  <td class="py-2 px-2 text-center font-mono text-sm font-bold text-white print:text-black bg-slate-700/30 print:bg-gray-100">
+                    {{ formatCurrencyPrint(declaration.incomes.total) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Cálculo del Impuesto -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 print:grid-cols-2">
+          <div>
+            <h4 class="text-sm font-semibold text-slate-300 print:text-gray-700 mb-3">Cálculo del Impuesto</h4>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between py-1">
+                <span class="text-slate-400 print:text-gray-600">Ingresos Brutos</span>
+                <span class="font-mono text-white print:text-black">{{ formatCurrencyPrint(declaration.incomes.total) }}</span>
+              </div>
+              <div class="flex justify-between py-1 text-red-400 print:text-red-600">
+                <span>(-) Mínimo Exento</span>
+                <span class="font-mono">{{ formatCurrencyPrint(declaration.deductions.minimumExempt) }}</span>
+              </div>
+              <div class="flex justify-between py-1 text-red-400 print:text-red-600">
+                <span>(-) Gastos Deducibles (40%)</span>
+                <span class="font-mono">{{ formatCurrencyPrint(declaration.deductions.estimatedExpenses) }}</span>
+              </div>
+              <div class="border-t border-slate-700/50 print:border-gray-300 pt-2 flex justify-between font-semibold">
+                <span class="text-white print:text-black">Base Imponible</span>
+                <span class="font-mono text-white print:text-black">{{ formatCurrencyPrint(declaration.calculation.taxableBase) }}</span>
+              </div>
+              <div class="flex justify-between py-1 mt-2 p-2 bg-slate-700/30 print:bg-gray-100 rounded">
+                <span class="text-slate-300 print:text-gray-700">Impuesto Bruto</span>
+                <span class="font-mono font-bold text-white print:text-black">{{ formatCurrencyPrint(declaration.calculation.grossTax) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-semibold text-slate-300 print:text-gray-700 mb-3">Resultado de la Declaración</h4>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between py-1">
+                <span class="text-slate-400 print:text-gray-600">Impuesto Anual a Pagar</span>
+                <span class="font-mono text-white print:text-black">{{ formatCurrencyPrint(declaration.result.annualTaxDue) }}</span>
+              </div>
+              <div class="flex justify-between py-1 text-emerald-400 print:text-green-600">
+                <span>(-) Aportes a Cuenta Pagados</span>
+                <span class="font-mono">{{ formatCurrencyPrint(declaration.result.advancesPaid) }}</span>
+              </div>
+              <div class="border-t border-slate-700/50 print:border-gray-300 pt-2">
+                <div 
+                  class="p-3 rounded-lg print:rounded-none print:border"
+                  :class="{
+                    'bg-emerald-500/20 print:bg-green-50 print:border-green-300': declaration.result.status === 'SALDADO',
+                    'bg-amber-500/20 print:bg-amber-50 print:border-amber-300': declaration.result.status === 'A FAVOR',
+                    'bg-red-500/20 print:bg-red-50 print:border-red-300': declaration.result.status === 'A PAGAR'
+                  }"
+                >
+                  <div class="flex justify-between items-center">
+                    <span class="font-semibold text-white print:text-black">DEUDA PENDIENTE</span>
+                    <div class="text-right">
+                      <span 
+                        class="font-mono font-bold text-xl"
+                        :class="{
+                          'text-emerald-400 print:text-green-700': declaration.result.status === 'SALDADO',
+                          'text-amber-400 print:text-amber-700': declaration.result.status === 'A FAVOR',
+                          'text-red-400 print:text-red-700': declaration.result.status === 'A PAGAR'
+                        }"
+                      >
+                        {{ declaration.result.hasToPay ? formatCurrencyPrint(declaration.result.balance) : declaration.result.hasRefund ? '+' + formatCurrencyPrint(declaration.result.balance) : '$0.00 CUP' }}
+                      </span>
+                      <p class="text-xs font-medium mt-1" :class="{
+                        'text-emerald-400 print:text-green-600': declaration.result.status === 'SALDADO',
+                        'text-amber-400 print:text-amber-600': declaration.result.status === 'A FAVOR',
+                        'text-red-400 print:text-red-600': declaration.result.status === 'A PAGAR'
+                      }">
+                        {{ declaration.result.status === 'SALDADO' ? '¡SIN DEUDAS!' : declaration.result.status === 'A FAVOR' ? 'SALDO A TU FAVOR' : 'PENDIENTE DE PAGO' }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pagos a Cuenta Realizados -->
+        <div class="mt-6">
+          <h4 class="text-sm font-semibold text-slate-300 print:text-gray-700 mb-3">Pagos a Cuenta Realizados</h4>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-slate-700/50 print:border-gray-300">
+                  <th class="py-2 px-2 text-left text-slate-400 print:text-gray-600 font-medium">Concepto</th>
+                  <th class="py-2 px-2 text-left text-slate-400 print:text-gray-600 font-medium">Código</th>
+                  <th class="py-2 px-2 text-left text-slate-400 print:text-gray-600 font-medium text-xs">Nota</th>
+                  <th class="py-2 px-2 text-right text-slate-400 print:text-gray-600 font-medium">Monto Pagado</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="border-b border-slate-700/30 print:border-gray-200">
+                  <td class="py-2 px-2 text-white print:text-black">Impuesto s/ Ventas</td>
+                  <td class="py-2 px-2 font-mono text-slate-400 print:text-gray-600">0114022</td>
+                  <td class="py-2 px-2 text-xs text-slate-500 print:text-gray-500">No se descuenta de la DJ</td>
+                  <td class="py-2 px-2 text-right font-mono text-slate-400 print:text-gray-600">{{ formatCurrencyPrint(declaration.paymentsOnAccount.salesTax.paid) }}</td>
+                </tr>
+                <tr class="border-b border-slate-700/30 print:border-gray-200 bg-emerald-500/10 print:bg-green-50">
+                  <td class="py-2 px-2 text-white print:text-black">Aportes a cuenta</td>
+                  <td class="py-2 px-2 font-mono text-slate-400 print:text-gray-600">0510122</td>
+                  <td class="py-2 px-2 text-xs text-emerald-400 print:text-green-600">Se descuenta del impuesto anual</td>
+                  <td class="py-2 px-2 text-right font-mono font-bold text-emerald-400 print:text-green-700">{{ formatCurrencyPrint(declaration.paymentsOnAccount.incomeAdvance.paid) }}</td>
+                </tr>
+                <tr class="border-b border-slate-700/30 print:border-gray-200">
+                  <td class="py-2 px-2 text-white print:text-black">Pagos trimestrales</td>
+                  <td class="py-2 px-2 font-mono text-slate-400 print:text-gray-600">0820132</td>
+                  <td class="py-2 px-2 text-xs text-slate-500 print:text-gray-500">Obligación separada</td>
+                  <td class="py-2 px-2 text-right font-mono text-slate-400 print:text-gray-600">{{ formatCurrencyPrint(declaration.paymentsOnAccount.quarterly.paid) }}</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr class="bg-slate-800/50 print:bg-gray-100 font-bold">
+                  <td colspan="3" class="py-3 px-2 text-white print:text-black">TOTAL PAGOS</td>
+                  <td class="py-3 px-2 text-right font-mono text-white print:text-black">
+                    {{ formatCurrencyPrint(declaration.paymentsOnAccount.salesTax.paid + declaration.paymentsOnAccount.incomeAdvance.paid + declaration.paymentsOnAccount.quarterly.paid) }}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- Print Footer -->
       <div class="hidden print:block mt-8 pt-4 border-t border-gray-300 text-xs text-gray-500">
         <div class="flex justify-between">
-          <p>Vector Fiscal - Sistema de Gestión ONAT {{ selectedYear }}</p>
+          <p>MiONAT - Sistema de Gestión ONAT {{ selectedYear }}</p>
           <p>Página 1 de 1</p>
         </div>
         <p class="mt-1">Este documento es un resumen informativo de las obligaciones tributarias registradas en el sistema.</p>
@@ -385,13 +593,14 @@
 
 <script setup>
 import { ref, computed, onMounted, watch, h } from 'vue'
-import { obligationsApi, paymentsApi, incomesApi } from '../services/api'
+import { obligationsApi, paymentsApi, incomesApi, predictionsApi } from '../services/api'
 
 const selectedYear = ref(2025)
 const loading = ref(true)
 const obligationsSummary = ref({ pending: 0, paid: 0, overdue: 0, total: 0, totalAmount: 0, paidAmount: 0, avgMonthlyPayment: 0 })
 const paymentsSummary = ref({ totalPaid: 0, totalBonus: 0, totalPayments: 0, byMonth: [], byMethod: [] })
 const incomeSummary = ref({ months: [], totals: null })
+const declaration = ref(null)
 const allPayments = ref([])
 const allObligations = ref([])
 
@@ -566,12 +775,13 @@ function printReport() {
 async function loadData() {
   loading.value = true
   try {
-    const [obligationsRes, paymentsRes, incomesRes, paymentsListRes, obligationsListRes] = await Promise.all([
+    const [obligationsRes, paymentsRes, incomesRes, paymentsListRes, obligationsListRes, declarationRes] = await Promise.all([
       obligationsApi.getSummary(selectedYear.value),
       paymentsApi.getSummary(selectedYear.value),
       incomesApi.getAnnualSummary(selectedYear.value),
       paymentsApi.getAll(),
-      obligationsApi.getAll()
+      obligationsApi.getAll(),
+      predictionsApi.getAnnualDeclaration(selectedYear.value)
     ])
     
     obligationsSummary.value = obligationsRes.data
@@ -579,6 +789,7 @@ async function loadData() {
     incomeSummary.value = incomesRes.data
     allPayments.value = paymentsListRes.data
     allObligations.value = obligationsListRes.data
+    declaration.value = declarationRes.data
   } catch (error) {
     console.error('Error loading data:', error)
   } finally {

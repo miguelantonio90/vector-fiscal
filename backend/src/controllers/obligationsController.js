@@ -10,7 +10,17 @@ exports.getAll = async (req, res) => {
     if (status) filter.status = status;
     if (tributeCode) filter.tributeCode = tributeCode;
     
-    const obligations = await Obligation.find(filter).sort({ dueDate: 1 });
+    let obligations = await Obligation.find(filter).sort({ dueDate: 1 });
+    
+    // Filtrar obligaciones 0510122 (aporte a cuenta) con monto 0 o sin monto
+    // que no tienen status 'pagado' - estas no aplican porque el ingreso no superó el mínimo
+    obligations = obligations.filter(o => {
+      if (o.tributeCode === '0510122' && (!o.amount || o.amount === 0) && o.status !== 'pagado') {
+        return false; // No mostrar esta obligación
+      }
+      return true;
+    });
+    
     res.json(obligations);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -87,11 +97,19 @@ exports.getUpcoming = async (req, res) => {
     const thirtyDaysLater = new Date();
     thirtyDaysLater.setDate(today.getDate() + 30);
     
-    const obligations = await Obligation.find({
+    let obligations = await Obligation.find({
       user: req.user._id,
       status: 'pendiente',
       dueDate: { $gte: today, $lte: thirtyDaysLater }
     }).sort({ dueDate: 1 });
+    
+    // Filtrar obligaciones 0510122 con monto 0 (no aplican)
+    obligations = obligations.filter(o => {
+      if (o.tributeCode === '0510122' && (!o.amount || o.amount === 0)) {
+        return false;
+      }
+      return true;
+    });
     
     res.json(obligations);
   } catch (error) {
@@ -142,7 +160,7 @@ exports.importVectorFiscal2025 = async (req, res) => {
       { barcode: '58015', tributeCode: '0114022', period: 'Noviembre: 22/Dic/25', dueDate: '2025-12-22', periodicity: 'mensual', description: 'Impuesto s/ ventas y servicios (PN)' },
       { barcode: '78815', tributeCode: '0114022', period: 'Diciembre: 20/Ene/26', dueDate: '2026-01-20', periodicity: 'mensual', description: 'Impuesto s/ ventas y servicios (PN)' },
       
-      // Aporte a cuenta Impuesto s/ Ingresos Personales - MENSUAL (5% sobre ingresos > 3,260 CUP)
+      // Aporte a cuenta Impuesto s/ Ingresos Personales - MENSUAL (3% sobre ingresos > 3,260 CUP)
       // Solo aplica cuando los ingresos mensuales superan el mínimo exento (3,260 CUP)
       { barcode: '10016', tributeCode: '0510122', period: 'Enero: 20/Feb/25', dueDate: '2025-02-20', periodicity: 'mensual', description: 'Aporte a cuenta Imp. Ingresos Personales', amount: 0, conditional: true },
       { barcode: '30816', tributeCode: '0510122', period: 'Febrero: 20/Mar/25', dueDate: '2025-03-20', periodicity: 'mensual', description: 'Aporte a cuenta Imp. Ingresos Personales', amount: 0, conditional: true },

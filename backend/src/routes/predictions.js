@@ -20,5 +20,8 @@ router.post('/calculate', predictionsController.calculateEstimate);
 // GET /api/predictions/summary - Resumen completo de predicciones
 router.get('/summary', predictionsController.getSummary);
 
+// GET /api/predictions/annual-declaration - Declaración Jurada Anual (DJ-08)
+router.get('/annual-declaration', predictionsController.getAnnualDeclaration);
+
 module.exports = router;
 

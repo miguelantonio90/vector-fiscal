@@ -1,7 +1,7 @@
 {
-  "name": "vector-fiscal-backend",
+  "name": "mionat-backend",
   "version": "1.0.0",
-  "description": "Backend API para gestión de pagos ONAT 2025",
+  "description": "Backend API para MiONAT - Gestión Tributaria ONAT 2025",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",

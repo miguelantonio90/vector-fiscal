@@ -93,8 +93,8 @@
                 <span class="text-amber-400">{{ formatCurrency(mes.ingreso.amount * 0.10) }}</span>
               </div>
               <div v-if="mes.ingreso.amount > 3260" class="flex justify-between text-slate-400">
-                <span>Aporte (5%)</span>
-                <span class="text-orange-400">{{ formatCurrency((mes.ingreso.amount - 3260) * 0.05) }}</span>
+                <span>Aporte (3%)</span>
+                <span class="text-orange-400">{{ formatCurrency((mes.ingreso.amount - 3260) * 0.03) }}</span>
               </div>
             </div>
           </div>
@@ -227,8 +227,8 @@
               <span class="text-amber-400 font-mono">{{ formatCurrency(formIngreso * 0.10) }}</span>
             </div>
             <div v-if="formIngreso > 3260" class="flex justify-between text-sm">
-              <span class="text-slate-400">Aporte Ingresos (5% de {{ formatCurrency(formIngreso - 3260) }})</span>
-              <span class="text-orange-400 font-mono">{{ formatCurrency((formIngreso - 3260) * 0.05) }}</span>
+              <span class="text-slate-400">Aporte Ingresos (3% de {{ formatCurrency(formIngreso - 3260) }})</span>
+              <span class="text-orange-400 font-mono">{{ formatCurrency((formIngreso - 3260) * 0.03) }}</span>
             </div>
             <div v-else class="text-sm text-emerald-400">
               ✓ No aplica aporte (ingreso ≤ $3,260)
@@ -236,7 +236,7 @@
             <div class="flex justify-between text-sm pt-2 border-t border-slate-700">
               <span class="text-white font-medium">Total impuestos</span>
               <span class="text-onat-red font-mono font-bold">
-                {{ formatCurrency(formIngreso * 0.10 + (formIngreso > 3260 ? (formIngreso - 3260) * 0.05 : 0)) }}
+                {{ formatCurrency(formIngreso * 0.10 + (formIngreso > 3260 ? (formIngreso - 3260) * 0.03 : 0)) }}
               </span>
             </div>
           </div>
@@ -351,7 +351,8 @@ function getBarHeight(amount) {
 
 function editarMes(mes) {
   editingMes.value = mes
-  formIngreso.value = mes.ingreso?.amount || null
+  // Usar amount (que ya fue mapeado de grossIncome) o grossIncome directamente
+  formIngreso.value = mes.ingreso?.amount || mes.ingreso?.grossIncome || null
   formNotas.value = mes.ingreso?.notes || ''
   showModal.value = true
 }
@@ -371,7 +372,7 @@ async function guardarIngreso() {
     await incomesApi.upsert({
       month: editingMes.value.numero,
       year: 2025,
-      amount: formIngreso.value,
+      grossIncome: formIngreso.value,
       notes: formNotas.value
     })
     await loadData()
@@ -402,7 +403,11 @@ async function loadData() {
   loading.value = true
   try {
     const res = await incomesApi.getAll({ year: 2025 })
-    ingresos.value = res.data
+    // Mapear grossIncome a amount para compatibilidad con el resto del código
+    ingresos.value = res.data.map(ing => ({
+      ...ing,
+      amount: ing.grossIncome || ing.amount || 0
+    }))
   } catch (error) {
     console.error('Error loading incomes:', error)
   } finally {

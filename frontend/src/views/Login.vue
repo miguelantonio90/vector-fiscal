@@ -11,7 +11,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
           </svg>
         </div>
-        <h1 class="text-3xl font-bold text-white tracking-tight">Vector Fiscal</h1>
+        <h1 class="text-3xl font-bold text-white tracking-tight">MiONAT</h1>
         <p class="text-slate-400 mt-2">Sistema de Gestión ONAT 2025</p>
       </div>
 
@@ -116,7 +116,7 @@
 
       <!-- Footer -->
       <p class="text-center text-slate-500 text-sm mt-8">
-        © 2025 Vector Fiscal. Sistema de Gestión Tributaria.
+        © 2025 MiONAT. Sistema de Gestión Tributaria.
       </p>
     </div>
   </div>

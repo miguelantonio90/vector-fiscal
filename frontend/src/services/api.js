@@ -135,7 +135,10 @@ export const predictionsApi = {
   calculate: (income, includeBonus = true) => api.post('/predictions/calculate', { income, includeBonus }),
   
   // Resumen completo de predicciones
-  getSummary: (year = new Date().getFullYear()) => api.get('/predictions/summary', { params: { year } })
+  getSummary: (year = new Date().getFullYear()) => api.get('/predictions/summary', { params: { year } }),
+  
+  // Declaración Jurada Anual (DJ-08)
+  getAnnualDeclaration: (year = new Date().getFullYear() - 1) => api.get('/predictions/annual-declaration', { params: { year } })
 }
 
 export default api

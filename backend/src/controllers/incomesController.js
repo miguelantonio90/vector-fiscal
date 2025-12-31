@@ -1,5 +1,5 @@
 const { Income } = require('../models');
-const { calculateTaxes } = require('../utils/taxCalculator');
+const { calculateMonthlyTaxes, calculateIncomeAdvance } = require('../utils/taxCalculator');
 
 // Obtener todos los ingresos del usuario actual
 exports.getAll = async (req, res) => {
@@ -37,10 +37,14 @@ exports.getByMonthYear = async (req, res) => {
 // Crear o actualizar ingreso mensual para el usuario actual
 exports.upsert = async (req, res) => {
   try {
-    const { month, year, grossIncome, deductibleExpenses, notes } = req.body;
+    const { month, year, grossIncome, deductibleExpenses = 0, notes } = req.body;
     
-    // Calcular impuestos
-    const taxes = calculateTaxes(grossIncome, deductibleExpenses);
+    // Calcular impuestos usando las funciones correctas
+    const monthlyTaxes = calculateMonthlyTaxes(grossIncome || 0);
+    const incomeAdvance = calculateIncomeAdvance(grossIncome || 0);
+    
+    // Calcular ingreso neto (ingreso bruto - impuesto de ventas)
+    const netIncome = (grossIncome || 0) - monthlyTaxes.taxes.salesTax.amount;
     
     const income = await Income.findOneAndUpdate(
       { user: req.user._id, month, year },
@@ -48,11 +52,11 @@ exports.upsert = async (req, res) => {
         user: req.user._id,
         month,
         year,
-        grossIncome,
-        deductibleExpenses,
-        netIncome: taxes.netIncome,
-        salesTax: taxes.salesTax,
-        personalIncomeTax: taxes.personalIncomeTax,
+        grossIncome: grossIncome || 0,
+        deductibleExpenses: deductibleExpenses || 0,
+        netIncome: netIncome,
+        salesTax: monthlyTaxes.taxes.salesTax.amount,
+        personalIncomeTax: incomeAdvance.amount,
         notes
       },
       { new: true, upsert: true, runValidators: true }
@@ -60,7 +64,7 @@ exports.upsert = async (req, res) => {
     
     res.json({
       income,
-      taxBreakdown: taxes
+      taxBreakdown: monthlyTaxes
     });
   } catch (error) {
     res.status(400).json({ error: error.message });

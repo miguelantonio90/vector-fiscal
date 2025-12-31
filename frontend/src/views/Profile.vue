@@ -231,7 +231,7 @@
       <h3 class="text-lg font-semibold text-white mb-6">Acciones de Cuenta</h3>
       
       <div class="space-y-4">
-        <!-- Importar Vector Fiscal -->
+        <!-- Importar MiONAT -->
         <button 
           @click="importVectorFiscal"
           :disabled="importing"
@@ -244,7 +244,7 @@
               </svg>
             </div>
             <div class="text-left">
-              <p class="font-medium text-white">Importar Vector Fiscal 2025</p>
+              <p class="font-medium text-white">Importar MiONAT 2025</p>
               <p class="text-sm text-slate-400">Cargar obligaciones del año fiscal actual</p>
             </div>
           </div>

@@ -1,8 +1,8 @@
-# Vector Fiscal - Sistema de Gestión ONAT 2025
+# MiONAT - Sistema de Gestión Tributaria 2025
 
 Sistema web multi-usuario para gestionar pagos tributarios a la ONAT (Oficina Nacional de Administración Tributaria) de Cuba para el año fiscal 2025.
 
-![Vector Fiscal](https://img.shields.io/badge/Vue.js-3.x-4FC08D?style=flat-square&logo=vue.js)
+![MiONAT](https://img.shields.io/badge/Vue.js-3.x-4FC08D?style=flat-square&logo=vue.js)
 ![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=flat-square&logo=node.js)
 ![MongoDB](https://img.shields.io/badge/MongoDB-6+-47A248?style=flat-square&logo=mongodb)
 ![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.x-06B6D4?style=flat-square&logo=tailwindcss)
@@ -31,7 +31,7 @@ Sistema web multi-usuario para gestionar pagos tributarios a la ONAT (Oficina Na
 ## 📁 Estructura del Proyecto
 
 ```
-vector-fiscal/
+mionat/
 ├── backend/                    # API Node.js + Express
 │   └── src/
 │       ├── config/            # Configuración de base de datos
@@ -64,7 +64,7 @@ npm install
 Crear archivo `.env`:
 ```env
 PORT=3000
-MONGODB_URI=mongodb://localhost:27017/vector-fiscal
+MONGODB_URI=mongodb://localhost:27017/mionat
 JWT_SECRET=tu-clave-secreta-aqui
 JWT_EXPIRES_IN=30d
 ```
@@ -131,7 +131,7 @@ Authorization: Bearer <token>
 | GET | `/api/obligations` | Listar obligaciones |
 | GET | `/api/obligations/upcoming` | Próximos vencimientos |
 | GET | `/api/obligations/summary` | Resumen del año |
-| POST | `/api/obligations/import` | Importar Vector Fiscal 2025 |
+| POST | `/api/obligations/import` | Importar obligaciones 2025 |
 | PUT | `/api/obligations/:id` | Actualizar obligación |
 
 ### Pagos
@@ -211,7 +211,7 @@ Authorization: Bearer <token>
 ### Perfil
 - Edición de nombre y NIT
 - Cambio de contraseña
-- Importación de Vector Fiscal
+- Importación de obligaciones
 - Estadísticas de actividad
 
 ### Notificaciones

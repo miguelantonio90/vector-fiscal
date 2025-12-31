@@ -15,19 +15,21 @@ import Login from './views/Login.vue'
 import Register from './views/Register.vue'
 import Users from './views/Users.vue'
 import CashFlow from './views/CashFlow.vue'
+import DeclaracionJurada from './views/DeclaracionJurada.vue'
 
 const routes = [
   { path: '/login', name: 'Login', component: Login, meta: { public: true } },
   { path: '/register', name: 'Register', component: Register, meta: { public: true } },
   { path: '/', name: 'Dashboard', component: Dashboard },
-  { path: '/calendario', name: 'Calendar', component: Calendar },
-  { path: '/calculadora', name: 'Calculator', component: Calculator },
-  { path: '/pagos', name: 'Payments', component: Payments },
-  { path: '/ingresos', name: 'Incomes', component: Incomes },
-  { path: '/flujo-caja', name: 'CashFlow', component: CashFlow },
-  { path: '/reportes', name: 'Reports', component: Reports },
-  { path: '/perfil', name: 'Profile', component: Profile },
-  { path: '/usuarios', name: 'Users', component: Users, meta: { adminOnly: true } }
+  { path: '/calendar', name: 'Calendar', component: Calendar },
+  { path: '/calculator', name: 'Calculator', component: Calculator },
+  { path: '/payments', name: 'Payments', component: Payments },
+  { path: '/incomes', name: 'Incomes', component: Incomes },
+  { path: '/cash-flow', name: 'CashFlow', component: CashFlow },
+  { path: '/annual-declaration', name: 'AnnualDeclaration', component: DeclaracionJurada },
+  { path: '/reports', name: 'Reports', component: Reports },
+  { path: '/profile', name: 'Profile', component: Profile },
+  { path: '/users', name: 'Users', component: Users, meta: { adminOnly: true } }
 ]
 
 const router = createRouter({
