@@ -19,7 +19,7 @@
             </div>
             <div>
               <h1 class="font-display text-xl font-bold text-white">MiONAT</h1>
-              <p class="text-xs text-slate-400">ONAT 2025</p>
+              <p class="text-xs text-slate-400">ONAT {{ currentYear }}</p>
             </div>
           </div>
         </div>
@@ -224,6 +224,9 @@ import { authApi, obligationsApi } from './services/api'
 
 const route = useRoute()
 const router = useRouter()
+
+// Current year
+const currentYear = new Date().getFullYear()
 
 // Notifications
 const showNotifications = ref(false)
