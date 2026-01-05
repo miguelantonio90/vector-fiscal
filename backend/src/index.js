@@ -25,8 +25,27 @@ app.use(express.json());
 app.use('/api/auth', require('./routes/auth'));
 
 // Ruta de health check para Render
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'MiONAT API funcionando', timestamp: new Date().toISOString() });
+app.get('/api/health', async (req, res) => {
+  const mongoose = require('mongoose');
+  const dbName = mongoose.connection.name;
+  const dbHost = mongoose.connection.host;
+  
+  // Contar documentos para debug
+  let userCount = 0;
+  let obligationCount = 0;
+  try {
+    userCount = await mongoose.connection.db.collection('users').countDocuments();
+    obligationCount = await mongoose.connection.db.collection('obligations').countDocuments();
+  } catch (e) {}
+  
+  res.json({ 
+    status: 'ok', 
+    message: 'MiONAT API funcionando', 
+    timestamp: new Date().toISOString(),
+    database: dbName,
+    host: dbHost,
+    counts: { users: userCount, obligations: obligationCount }
+  });
 });
 
 // Rutas protegidas (requieren autenticación)
