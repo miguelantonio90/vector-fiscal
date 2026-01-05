@@ -373,10 +373,7 @@ import { ref, computed, onMounted } from 'vue'
 import { predictionsApi } from '../services/api'
 
 const loading = ref(true)
-// Por defecto mostrar 2025 si estamos en los primeros meses de 2026 (antes de la DJ)
-const currentYear = new Date().getFullYear()
-const currentMonth = new Date().getMonth() + 1
-const selectedYear = ref(currentMonth <= 4 && currentYear === 2026 ? 2025 : currentYear)
+const selectedYear = ref(new Date().getFullYear())
 const selectedMonth = ref(null)
 const cashFlow = ref(null)
 const predictions = ref(null)
