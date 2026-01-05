@@ -12,7 +12,7 @@
           </svg>
         </div>
         <h1 class="text-3xl font-bold text-white tracking-tight">MiONAT</h1>
-        <p class="text-slate-400 mt-2">Sistema de Gestión ONAT 2025</p>
+        <p class="text-slate-400 mt-2">Sistema de Gestión ONAT {{ currentYear }}</p>
       </div>
 
       <!-- Register Card -->
@@ -126,7 +126,7 @@
 
       <!-- Footer -->
       <p class="text-center text-slate-500 text-sm mt-8">
-        © 2025 MiONAT. Sistema de Gestión Tributaria.
+        © {{ currentYear }} MiONAT. Sistema de Gestión Tributaria.
       </p>
     </div>
   </div>
@@ -144,6 +144,7 @@ const nit = ref('')
 const loading = ref(false)
 const error = ref('')
 const success = ref('')
+const currentYear = new Date().getFullYear()
 
 const handleRegister = async () => {
   loading.value = true
