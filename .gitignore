@@ -48,3 +48,4 @@ temp/
 # MongoDB data (if local)
 data/db/
 
+db-backup/
