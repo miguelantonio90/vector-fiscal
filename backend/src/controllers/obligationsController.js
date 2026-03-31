@@ -1,4 +1,4 @@
-const { Obligation, User } = require('../models');
+const { Obligation, Payment, User } = require('../models');
 const { parseVectorFiscalPDF } = require('../utils/vectorFiscalParser');
 
 // Obtener todas las obligaciones del usuario actual
@@ -136,6 +136,73 @@ exports.getOverdue = async (req, res) => {
     );
     
     res.json(obligations);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Obtener datos formateados como el Vector Fiscal RC-04A
+exports.getVectorFiscal = async (req, res) => {
+  try {
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+    const userId = req.user._id;
+
+    const obligations = await Obligation.find({
+      user: userId,
+      fiscalYear: year
+    }).sort({ dueDate: 1 });
+
+    const payments = await Payment.find({ user: userId })
+      .populate('obligation');
+
+    const paymentsByObligation = {};
+    for (const p of payments) {
+      const oblId = (p.obligation?._id || p.obligation)?.toString();
+      if (oblId) paymentsByObligation[oblId] = p;
+    }
+
+    const tributeDescriptions = {
+      '0114022': 'Impuesto s/ ventas y servicios (PN)',
+      '0510122': 'Impuesto s/ ingresos personales - aporte mensual',
+      '0530222': 'Imp. s/ ingresos personales (liquid. adicional)',
+      '0820132': 'Contribución especial a la seguridad social'
+    };
+
+    const rows = obligations.map(o => {
+      const payment = paymentsByObligation[o._id.toString()];
+      return {
+        paid: o.status === 'pagado',
+        overdue: o.status === 'vencido',
+        barcode: o.barcode,
+        amount: o.amount || null,
+        paidAmount: payment?.amount || null,
+        tributeCode: o.tributeCode,
+        period: o.period,
+        dueDate: o.dueDate,
+        status: o.status,
+        paymentDate: payment?.paymentDate || null,
+        paymentMethod: payment?.paymentMethod || null,
+        bonusAmount: payment?.bonusAmount || 0
+      };
+    });
+
+    const user = await User.findById(userId).select('nit name');
+    const tributeCodes = [...new Set(obligations.map(o => o.tributeCode))];
+    const tributes = tributeCodes.map(code => ({
+      code,
+      description: tributeDescriptions[code] || code
+    }));
+
+    res.json({
+      title: 'RC-04A Vector fiscal de persona natural',
+      user: { nit: user.nit, name: user.name },
+      fiscalYear: year,
+      obligations: rows,
+      tributes,
+      totalObligations: rows.length,
+      totalPaid: rows.filter(r => r.paid).length,
+      totalPending: rows.filter(r => !r.paid).length
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

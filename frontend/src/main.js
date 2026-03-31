@@ -16,6 +16,7 @@ import Register from './views/Register.vue'
 import Users from './views/Users.vue'
 import CashFlow from './views/CashFlow.vue'
 import DeclaracionJurada from './views/DeclaracionJurada.vue'
+import VectorFiscal from './views/VectorFiscal.vue'
 
 const routes = [
   { path: '/login', name: 'Login', component: Login, meta: { public: true } },
@@ -28,6 +29,7 @@ const routes = [
   { path: '/cash-flow', name: 'CashFlow', component: CashFlow },
   { path: '/annual-declaration', name: 'AnnualDeclaration', component: DeclaracionJurada },
   { path: '/reports', name: 'Reports', component: Reports },
+  { path: '/vector-fiscal', name: 'VectorFiscal', component: VectorFiscal },
   { path: '/profile', name: 'Profile', component: Profile },
   { path: '/users', name: 'Users', component: Users, meta: { adminOnly: true } }
 ]

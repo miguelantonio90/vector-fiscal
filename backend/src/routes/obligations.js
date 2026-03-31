@@ -23,6 +23,9 @@ router.get('/overdue', controller.getOverdue);
 // GET /api/obligations/summary - Resumen de obligaciones
 router.get('/summary', controller.getSummary);
 
+// GET /api/obligations/vector-fiscal - Datos formateados como RC-04A
+router.get('/vector-fiscal', controller.getVectorFiscal);
+
 // POST /api/obligations/import-pdf - Importar desde PDF del Vector Fiscal
 router.post('/import-pdf', upload.single('vectorFiscal'), controller.importFromPDF);
 

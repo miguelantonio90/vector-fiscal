@@ -73,7 +73,8 @@ export const obligationsApi = {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
   },
-  reprocessPDF: () => api.post('/obligations/reprocess')
+  reprocessPDF: () => api.post('/obligations/reprocess'),
+  getVectorFiscal: (year = new Date().getFullYear()) => api.get('/obligations/vector-fiscal', { params: { year } })
 }
 
 // Payments API
