@@ -104,9 +104,8 @@ exports.getById = async (req, res) => {
 // Registrar nuevo pago para el usuario actual
 exports.create = async (req, res) => {
   try {
-    const { obligationId, amount, paymentDate, paymentMethod, reference, notes, bonusMode, bonusAmountSaved } = req.body;
+    const { obligationId, amount, principalAmount: clientPrincipal, paymentDate, paymentMethod, reference, notes, bonusMode, bonusAmountSaved } = req.body;
     
-    // Verificar que la obligación existe y pertenece al usuario
     const obligation = await Obligation.findOne({
       _id: obligationId,
       user: req.user._id
@@ -115,35 +114,32 @@ exports.create = async (req, res) => {
       return res.status(404).json({ error: 'Obligación no encontrada' });
     }
     
-    // amount = valor real del impuesto (antes de bonificación)
-    // bonusAmount = ahorro por canal/anticipación (no altera el valor fiscal)
+    const pDate = new Date(paymentDate || Date.now());
+    const principal = clientPrincipal || amount;
+    const surcharge = calculateLateSurcharge(principal, obligation.dueDate, pDate);
+
     let bonusApplied = 0;
     let bonusAmount = 0;
     
     if (bonusMode === 'already') {
       bonusAmount = bonusAmountSaved || 0;
-      if (amount > 0 && bonusAmount > 0) {
-        bonusApplied = (bonusAmount / amount) * 100;
+      if (principal > 0 && bonusAmount > 0) {
+        bonusApplied = (bonusAmount / principal) * 100;
       }
     } else if (bonusMode === 'calculate') {
       if (paymentMethod === 'transfermovil') {
         bonusApplied += 3;
       }
-      const pDate = new Date(paymentDate || Date.now());
       if (pDate < new Date(obligation.dueDate)) {
         bonusApplied += 5;
       }
-      bonusAmount = (amount * bonusApplied) / 100;
+      bonusAmount = (principal * bonusApplied) / 100;
     }
-    
-    const pDate = new Date(paymentDate || Date.now());
-
-    const surcharge = calculateLateSurcharge(amount, obligation.dueDate, pDate);
 
     const payment = new Payment({
       user: req.user._id,
       obligation: obligationId,
-      amount,
+      amount: principal,
       paymentDate: pDate,
       paymentMethod,
       bonusApplied,
@@ -156,16 +152,17 @@ exports.create = async (req, res) => {
     await payment.save();
     
     obligation.status = 'pagado';
-    obligation.amount = amount;
+    obligation.amount = principal;
     await obligation.save();
     
     res.status(201).json({
       payment,
+      totalPaid: amount,
       bonusInfo: {
-        amount,
+        principal,
         bonusApplied: `${bonusApplied}%`,
         bonusAmount,
-        actualPaid: amount - bonusAmount
+        actualPaid: principal - bonusAmount
       },
       surcharge: surcharge || null
     });

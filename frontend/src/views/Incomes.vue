@@ -181,7 +181,7 @@
 
     <!-- Edit Modal -->
     <div v-if="showModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div class="bg-slate-800 rounded-2xl p-6 w-full max-w-md border border-slate-700 animate-fade-in">
+      <div class="bg-slate-800 rounded-2xl p-6 w-full max-w-xl border border-slate-700 animate-fade-in">
         <div class="flex items-center justify-between mb-6">
           <h3 class="text-xl font-display font-bold text-white">
             {{ editingMes?.ingreso ? 'Editar' : 'Registrar' }} Ingreso - {{ editingMes?.nombre }}

@@ -299,6 +299,10 @@
             </select>
             <p v-if="availableObligations.length === 0 && !isEditing" class="text-xs text-emerald-400 mt-1">No hay obligaciones pendientes. ¡Estás al día!</p>
             <p v-if="isEditing" class="text-xs text-slate-500 mt-1">No se puede cambiar la obligación al editar</p>
+            <p v-if="missingIncomeWarning" class="text-xs text-amber-400 mt-1 flex items-center gap-1">
+              <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              {{ missingIncomeWarning }}
+            </p>
           </div>
 
           <!-- Two columns: Amount & Date -->
@@ -310,7 +314,7 @@
                   <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  Monto pagado (CUP)
+                  Monto a pagar (CUP)
                 </span>
               </label>
               <div class="relative">
@@ -320,12 +324,24 @@
                   type="number"
                   min="0"
                   step="0.01"
-                  class="input text-lg font-mono"
+                  class="input font-mono"
+                  :class="surchargePreview ? 'text-sm' : 'text-lg'"
                   style="padding-left: 28px"
                   placeholder="0.00"
                   required
                 />
               </div>
+              <div v-if="surchargePreview && principalAmount" class="mt-2 p-2 bg-red-900/30 rounded-lg space-y-1">
+                <div class="flex justify-between text-xs">
+                  <span class="text-slate-400">Principal</span>
+                  <span class="text-slate-300 font-mono">{{ formatCurrency(principalAmount) }}</span>
+                </div>
+                <div class="flex justify-between text-xs">
+                  <span class="text-red-400">Mora {{ surchargePreview.surchargeRate }}% ({{ surchargePreview.lateDays }} días)</span>
+                  <span class="text-red-400 font-mono">+{{ formatCurrency(surchargePreview.surchargeAmount) }}</span>
+                </div>
+              </div>
+              <p v-if="amountTooLow" class="text-xs text-red-400 mt-1">El monto no puede ser menor a {{ formatCurrency(minimumAmount) }} (principal{{ surchargePreview ? ' + recargo por mora' : '' }})</p>
             </div>
 
             <!-- Payment Date -->
@@ -497,24 +513,11 @@
           </div>
 
           <!-- Late Surcharge Warning -->
-          <div v-if="surchargePreview" class="p-4 bg-red-900/20 rounded-xl border border-red-700/30">
-            <p class="text-sm text-red-400 font-bold mb-2 flex items-center gap-2">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
-              Recargo por mora (Cód. 1060122)
+          <div v-if="surchargePreview" class="p-3 bg-red-900/20 rounded-xl border border-red-700/30">
+            <p class="text-sm text-red-400 font-bold flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+              Recargo por mora (1060122) — {{ surchargePreview.description }}
             </p>
-            <p class="text-xs text-slate-400 mb-2">{{ surchargePreview.description }}</p>
-            <div class="flex justify-between text-sm">
-              <span class="text-slate-300">Importe principal</span>
-              <span class="text-white font-mono">{{ formatCurrency(paymentForm.amount) }}</span>
-            </div>
-            <div class="flex justify-between text-sm mt-1">
-              <span class="text-red-300">Recargo ({{ surchargePreview.surchargeRate }}%)</span>
-              <span class="text-red-400 font-mono font-bold">+ {{ formatCurrency(surchargePreview.surchargeAmount) }}</span>
-            </div>
-            <div class="flex justify-between text-sm mt-2 pt-2 border-t border-red-800/50">
-              <span class="text-white font-bold">Total a pagar</span>
-              <span class="text-red-400 font-mono font-bold">{{ formatCurrency(paymentForm.amount + surchargePreview.surchargeAmount) }}</span>
-            </div>
           </div>
 
           <!-- Bonus Preview (when auto-calculating) -->
@@ -541,9 +544,9 @@
             </button>
             <button 
               type="submit" 
-              :disabled="submitting"
+              :disabled="submitting || amountTooLow"
               class="flex-[2] btn py-3 font-semibold text-white transition-all"
-              :class="isEditing ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+              :class="[isEditing ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700', amountTooLow ? 'opacity-50 cursor-not-allowed' : '']"
             >
               <span v-if="submitting" class="flex items-center justify-center gap-2">
                 <div class="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -575,7 +578,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { paymentsApi, obligationsApi } from '../services/api'
+import { paymentsApi, obligationsApi, incomesApi } from '../services/api'
 
 const route = useRoute()
 
@@ -585,6 +588,7 @@ const showPaymentModal = ref(false)
 const payments = ref([])
 const pendingObligations = ref([])
 const allObligations = ref([])
+const incomes = ref([])
 const paymentSummary = ref({ totalPaid: 0, totalBonus: 0, totalPayments: 0 })
 const currentYear = new Date().getFullYear()
 const filterYear = ref(currentYear)
@@ -685,6 +689,101 @@ const selectedObligation = computed(() => {
          pendingObligations.value.find(o => o._id === paymentForm.value.obligationId)
 })
 
+const monthNames = { enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6, julio: 7, agosto: 8, septiembre: 9, octubre: 10, noviembre: 11, diciembre: 12 }
+
+function getObligationMonth(obligation) {
+  if (!obligation?.period) return null
+  const p = obligation.period.toLowerCase()
+  for (const [name, num] of Object.entries(monthNames)) {
+    if (p.startsWith(name + ':')) return num
+  }
+  return null
+}
+
+function getObligationQuarterMonths(obligation) {
+  if (!obligation?.period) return []
+  const p = obligation.period.toLowerCase()
+  if (!p.startsWith('trimestre')) return []
+  const months = []
+  for (const [name, num] of Object.entries(monthNames)) {
+    if (p.includes(name)) months.push(num)
+  }
+  return months
+}
+
+function calcAmountForObligation(obl) {
+  if (!obl) return null
+  const code = obl.tributeCode
+
+  if (code === '0114022') {
+    const m = getObligationMonth(obl)
+    if (!m) return null
+    const inc = incomes.value.find(i => i.month === m)
+    if (!inc || !inc.amount) return null
+    return Math.round(inc.amount * 0.10 * 100) / 100
+  }
+
+  if (code === '0510122') {
+    const m = getObligationMonth(obl)
+    if (!m) return null
+    const inc = incomes.value.find(i => i.month === m)
+    if (!inc || !inc.amount || inc.amount <= 3260) return null
+    return Math.round((inc.amount - 3260) * 0.05 * 100) / 100
+  }
+
+  if (code === '0820132') {
+    if (obl.amount > 0) return obl.amount
+    return null
+  }
+
+  if (obl.amount > 0) return obl.amount
+  return null
+}
+
+const missingIncomeWarning = ref('')
+const principalAmount = ref(null)
+const surchargePreview = ref(null)
+let skipSurchargeWatch = false
+
+watch(() => paymentForm.value.obligationId, async (oblId) => {
+  missingIncomeWarning.value = ''
+  principalAmount.value = null
+  surchargePreview.value = null
+  if (!oblId || editingPaymentId.value) return
+
+  const obl = pendingObligations.value.find(o => o._id === oblId) ||
+              allObligations.value.find(o => o._id === oblId)
+  const amt = calcAmountForObligation(obl)
+
+  if (amt !== null) {
+    principalAmount.value = amt
+    const pDate = paymentForm.value.paymentDate
+    const due = obl?.dueDate ? new Date(obl.dueDate) : null
+    const pay = pDate ? new Date(pDate) : null
+    let surchargeAmt = 0
+
+    if (due && pay) {
+      due.setHours(0,0,0,0)
+      pay.setHours(0,0,0,0)
+      if (pay > due) {
+        try {
+          const res = await paymentsApi.previewSurcharge(oblId, amt, pDate)
+          surchargePreview.value = res.data.surcharge
+          surchargeAmt = res.data.surcharge?.surchargeAmount || 0
+        } catch { /* ignore */ }
+      }
+    }
+    skipSurchargeWatch = true
+    paymentForm.value.amount = Math.round((amt + surchargeAmt) * 100) / 100
+  } else if (obl && (obl.tributeCode === '0114022' || obl.tributeCode === '0510122')) {
+    const m = getObligationMonth(obl)
+    const mesNombre = m ? Object.keys(monthNames).find(k => monthNames[k] === m) : null
+    const label = mesNombre ? mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1) : ''
+    paymentForm.value.amount = null
+    missingIncomeWarning.value = `Registra primero el ingreso de ${label} para calcular este monto automáticamente.`
+  }
+})
+
 const isEarlyPayment = computed(() => {
   if (!selectedObligation.value || !paymentForm.value.paymentDate) return false
   const payDate = new Date(paymentForm.value.paymentDate)
@@ -701,24 +800,46 @@ const isLatePayment = computed(() => {
   return payDate > dueDate
 })
 
-const surchargePreview = ref(null)
-
 watch(
-  () => [paymentForm.value.obligationId, paymentForm.value.amount, paymentForm.value.paymentDate],
-  async ([oblId, amt, pDate]) => {
-    if (!oblId || !amt || !pDate || !isLatePayment.value) {
+  () => paymentForm.value.paymentDate,
+  async (pDate) => {
+    if (skipSurchargeWatch) { skipSurchargeWatch = false; return }
+    if (!principalAmount.value || !paymentForm.value.obligationId || !pDate) {
       surchargePreview.value = null
       return
     }
+    const obl = selectedObligation.value
+    if (!obl) return
+    const due = new Date(obl.dueDate)
+    const pay = new Date(pDate)
+    due.setHours(0,0,0,0)
+    pay.setHours(0,0,0,0)
+    if (pay <= due) {
+      surchargePreview.value = null
+      paymentForm.value.amount = principalAmount.value
+      return
+    }
     try {
-      const res = await paymentsApi.previewSurcharge(oblId, amt, pDate)
+      const res = await paymentsApi.previewSurcharge(paymentForm.value.obligationId, principalAmount.value, pDate)
       surchargePreview.value = res.data.surcharge
+      const surchargeAmt = res.data.surcharge?.surchargeAmount || 0
+      paymentForm.value.amount = Math.round((principalAmount.value + surchargeAmt) * 100) / 100
     } catch {
       surchargePreview.value = null
     }
-  },
-  { immediate: true }
+  }
 )
+
+const minimumAmount = computed(() => {
+  const base = principalAmount.value || 0
+  const mora = surchargePreview.value?.surchargeAmount || 0
+  return Math.round((base + mora) * 100) / 100
+})
+
+const amountTooLow = computed(() => {
+  if (!principalAmount.value || !paymentForm.value.amount) return false
+  return paymentForm.value.amount < minimumAmount.value
+})
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('es-CU', {
@@ -803,18 +924,20 @@ function editPayment(payment) {
 async function loadData() {
   loading.value = true
   try {
-    const [paymentsRes, summaryRes, pendingRes, overdueRes, allRes] = await Promise.all([
+    const [paymentsRes, summaryRes, pendingRes, overdueRes, allRes, incomesRes] = await Promise.all([
       paymentsApi.getAll(),
       paymentsApi.getSummary(),
       obligationsApi.getAll({ status: 'pendiente', year: currentYear }),
       obligationsApi.getAll({ status: 'vencido', year: currentYear }),
-      obligationsApi.getAll({ year: currentYear })
+      obligationsApi.getAll({ year: currentYear }),
+      incomesApi.getAll({ year: currentYear })
     ])
     
     payments.value = paymentsRes.data
     paymentSummary.value = summaryRes.data
     pendingObligations.value = [...pendingRes.data, ...overdueRes.data]
     allObligations.value = allRes.data
+    incomes.value = (incomesRes.data || []).map(i => ({ ...i, amount: i.amount || i.grossIncome || 0 }))
 
     // Check if obligationId was passed in URL
     if (route.query.obligationId) {
@@ -833,12 +956,13 @@ async function loadData() {
 }
 
 async function submitPayment() {
-  if (!paymentForm.value.obligationId || !paymentForm.value.amount) return
+  if (!paymentForm.value.obligationId || !paymentForm.value.amount || amountTooLow.value) return
 
   submitting.value = true
   try {
     const paymentData = {
       amount: paymentForm.value.amount,
+      principalAmount: principalAmount.value || paymentForm.value.amount,
       paymentDate: paymentForm.value.paymentDate,
       paymentMethod: paymentForm.value.paymentMethod,
       reference: paymentForm.value.reference,
