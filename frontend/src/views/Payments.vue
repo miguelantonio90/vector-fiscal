@@ -85,16 +85,26 @@
     <div class="card">
       <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <h3 class="text-lg font-display font-bold text-white">Historial de Pagos</h3>
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-3">
+          <select v-model="filterYear" class="input w-28 text-sm py-2">
+            <option v-for="y in yearOptions" :key="y" :value="y">{{ y || 'Todo a?o' }}</option>
+          </select>
+          <select v-model="filterTribute" class="input w-44 text-sm py-2">
+            <option value="">Todas las obligaciones</option>
+            <option value="0114022">Ventas y servicios</option>
+            <option value="0510122">Ingresos personales</option>
+            <option value="0820132">Pago trimestral</option>
+            <option value="0530222">Contrib. territorial</option>
+          </select>
           <select v-model="filterMethod" class="input w-40 text-sm py-2">
-            <option value="">Todos</option>
+            <option value="">Todo m?todo</option>
             <option value="efectivo">Efectivo</option>
-            <option value="transfermovil">Transfermóvil</option>
+            <option value="transfermovil">Transferm?vil</option>
             <option value="banco">Banco</option>
           </select>
           <select v-model="sortBy" class="input w-40 text-sm py-2">
-            <option value="date-desc">Más recientes</option>
-            <option value="date-asc">Más antiguos</option>
+            <option value="date-desc">M?s recientes</option>
+            <option value="date-asc">M?s antiguos</option>
             <option value="amount-desc">Mayor monto</option>
             <option value="amount-asc">Menor monto</option>
           </select>
@@ -271,11 +281,11 @@
                 <svg class="w-4 h-4 text-onat-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
-                Obligación a pagar
+                Obligaci?n a pagar
               </span>
             </label>
             <select v-model="paymentForm.obligationId" class="input" required :disabled="isEditing">
-              <option value="">Seleccionar obligación...</option>
+              <option value="">Seleccionar obligaci?n...</option>
               <option 
                 v-for="obligation in availableObligations" 
                 :key="obligation._id" 
@@ -284,7 +294,7 @@
                 {{ obligation.description }} - {{ obligation.period }}
               </option>
             </select>
-            <p v-if="isEditing" class="text-xs text-slate-500 mt-1">No se puede cambiar la obligación al editar</p>
+            <p v-if="isEditing" class="text-xs text-slate-500 mt-1">No se puede cambiar la obligaci?n al editar</p>
           </div>
 
           <!-- Two columns: Amount & Date -->
@@ -341,12 +351,12 @@
                   <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                   </svg>
-                  Método de pago
+                  M?todo de pago
                 </span>
               </label>
               <select v-model="paymentForm.paymentMethod" class="input" required>
                 <option value="efectivo">Efectivo</option>
-                <option value="transfermovil">Transfermóvil</option>
+                <option value="transfermovil">Transferm?vil</option>
                 <option value="banco">Banco</option>
                 <option value="otro">Otro</option>
               </select>
@@ -378,11 +388,11 @@
                 <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
                 </svg>
-                <span class="text-sm font-medium text-emerald-300">Bonificación</span>
+                <span class="text-sm font-medium text-emerald-300">Bonificaci?n</span>
               </div>
             </div>
 
-            <!-- Tipo de bonificación -->
+            <!-- Tipo de bonificaci?n -->
             <div class="mb-4">
               <div class="flex flex-wrap gap-2">
                 <button
@@ -395,7 +405,7 @@
                       : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700/50'
                   ]"
                 >
-                  Sin bonificación
+                  Sin bonificaci?n
                 </button>
                 <button
                   type="button"
@@ -419,14 +429,14 @@
                       : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700/50'
                   ]"
                 >
-                  Calcular automático
+                  Calcular autom?tico
                 </button>
               </div>
             </div>
 
-            <!-- Monto ahorrado si ya está aplicada -->
+            <!-- Monto ahorrado si ya est? aplicada -->
             <div v-if="paymentForm.bonusMode === 'already'" class="space-y-3">
-              <p class="text-xs text-slate-400">Indica cuánto ahorraste en pesos (CUP) por la bonificación:</p>
+              <p class="text-xs text-slate-400">Indica cu?nto ahorraste en pesos (CUP) por la bonificaci?n:</p>
               
               <div class="flex items-center gap-3 flex-wrap">
                 <div class="flex items-center gap-2 bg-slate-800/50 rounded-lg px-3 py-2">
@@ -448,18 +458,18 @@
               </p>
             </div>
 
-            <!-- Info para calcular automático -->
+            <!-- Info para calcular autom?tico -->
             <div v-else-if="paymentForm.bonusMode === 'calculate'" class="space-y-2">
-              <p class="text-xs text-slate-400">El sistema calculará automáticamente las bonificaciones:</p>
+              <p class="text-xs text-slate-400">El sistema calcular? autom?ticamente las bonificaciones:</p>
               <div class="flex gap-4 text-xs text-slate-500">
-                <span v-if="paymentForm.paymentMethod === 'transfermovil'" class="text-blue-400">+3% Transfermóvil</span>
+                <span v-if="paymentForm.paymentMethod === 'transfermovil'" class="text-blue-400">+3% Transferm?vil</span>
                 <span v-if="isEarlyPayment" class="text-emerald-400">+5% Anticipado</span>
               </div>
             </div>
 
-            <!-- Info para sin bonificación -->
+            <!-- Info para sin bonificaci?n -->
             <p v-else-if="paymentForm.bonusMode === 'none'" class="text-xs text-slate-500">
-              El monto ingresado se guardará tal cual, sin aplicar ni calcular bonificaciones.
+              El monto ingresado se guardar? tal cual, sin aplicar ni calcular bonificaciones.
             </p>
           </div>
 
@@ -483,7 +493,7 @@
 
           <!-- Bonus Preview (when auto-calculating) -->
           <div v-if="selectedObligation && paymentForm.amount && !paymentForm.bonusAlreadyApplied" class="p-4 bg-emerald-900/20 rounded-xl border border-emerald-700/30">
-            <p class="text-sm text-emerald-400 font-medium mb-2">Bonificaciones que se aplicarán:</p>
+            <p class="text-sm text-emerald-400 font-medium mb-2">Bonificaciones que se aplicar?n:</p>
             <div class="flex justify-between text-sm">
               <span class="text-slate-300">Pago anticipado (5%)</span>
               <span :class="isEarlyPayment ? 'text-emerald-400' : 'text-slate-500'">
@@ -491,7 +501,7 @@
               </span>
             </div>
             <div class="flex justify-between text-sm mt-1">
-              <span class="text-slate-300">Transfermóvil (3%)</span>
+              <span class="text-slate-300">Transferm?vil (3%)</span>
               <span :class="paymentForm.paymentMethod === 'transfermovil' ? 'text-emerald-400' : 'text-slate-500'">
                 {{ paymentForm.paymentMethod === 'transfermovil' ? 'Aplicable' : 'No aplicable' }}
               </span>
@@ -550,8 +560,17 @@ const payments = ref([])
 const pendingObligations = ref([])
 const allObligations = ref([])
 const paymentSummary = ref({ totalPaid: 0, totalBonus: 0, totalPayments: 0 })
+const currentYear = new Date().getFullYear()
+const filterYear = ref(currentYear)
 const filterMethod = ref('')
+const filterTribute = ref('')
 const sortBy = ref('date-desc')
+
+const yearOptions = computed(() => {
+  const years = new Set(payments.value.map(p => p.obligation?.fiscalYear).filter(Boolean))
+  years.add(currentYear)
+  return ['', ...Array.from(years).sort((a, b) => b - a)]
+})
 const toast = ref({ show: false, message: '', type: 'success' })
 const editingPaymentId = ref(null)
 
@@ -569,8 +588,17 @@ const paymentForm = ref({
 const isEditing = computed(() => !!editingPaymentId.value)
 
 const filteredPayments = computed(() => {
-  if (!filterMethod.value) return payments.value
-  return payments.value.filter(p => p.paymentMethod === filterMethod.value)
+  let result = payments.value
+  if (filterYear.value) {
+    result = result.filter(p => p.obligation?.fiscalYear === filterYear.value)
+  }
+  if (filterTribute.value) {
+    result = result.filter(p => p.obligation?.tributeCode === filterTribute.value)
+  }
+  if (filterMethod.value) {
+    result = result.filter(p => p.paymentMethod === filterMethod.value)
+  }
+  return result
 })
 
 const sortedPayments = computed(() => {
@@ -633,7 +661,7 @@ function getMonthFromDate(date) {
 function getMethodLabel(method) {
   const labels = {
     efectivo: 'Efectivo',
-    transfermovil: 'Transfermóvil',
+    transfermovil: 'Transferm?vil',
     banco: 'Banco',
     otro: 'Otro'
   }
@@ -674,7 +702,7 @@ function closeModal() {
 
 function editPayment(payment) {
   editingPaymentId.value = payment._id
-  // Determinar el modo de bonificación basado en los datos del pago
+  // Determinar el modo de bonificaci?n basado en los datos del pago
   let bonusMode = 'none'
   if (payment.bonusAmount > 0) {
     bonusMode = 'already'
@@ -759,7 +787,7 @@ async function submitPayment() {
 }
 
 async function deletePayment(id) {
-  if (!confirm('¿Estás seguro de eliminar este pago?')) return
+  if (!confirm('?Est?s seguro de eliminar este pago?')) return
 
   try {
     await paymentsApi.delete(id)
