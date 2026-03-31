@@ -698,7 +698,7 @@ async function loadData() {
   try {
     const [paymentsRes, summaryRes, pendingRes, allRes] = await Promise.all([
       paymentsApi.getAll(),
-      paymentsApi.getSummary(2025),
+      paymentsApi.getSummary(),
       obligationsApi.getAll({ status: 'pendiente' }),
       obligationsApi.getAll()
     ])

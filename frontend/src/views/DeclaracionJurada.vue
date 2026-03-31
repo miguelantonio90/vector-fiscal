@@ -15,9 +15,7 @@
           @change="loadData"
           class="px-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white focus:outline-none focus:border-emerald-500/50"
         >
-          <option :value="2023">2023</option>
-          <option :value="2024">2024</option>
-          <option :value="2025">2025</option>
+          <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
         </select>
       </div>
     </div>
@@ -372,6 +370,7 @@ import { predictionsApi } from '../services/api'
 const loading = ref(true)
 // Por defecto mostrar el año actual (donde probablemente hay datos)
 const selectedYear = ref(new Date().getFullYear())
+const yearOptions = [new Date().getFullYear() - 2, new Date().getFullYear() - 1, new Date().getFullYear()]
 const declaration = ref(null)
 
 const formatCurrency = (value) => {

@@ -1,0 +1,377 @@
+# MiONAT — AI Context Document
+
+## What is this project?
+
+MiONAT (aka vector-fiscal) is a multi-tenant web application for managing tax
+obligations to ONAT (Cuba's tax authority) for fiscal year 2025. Users register
+with their NIT, track monthly/quarterly tax obligations, record payments and
+income, and generate annual tax declarations (DJ-08).
+
+## Architecture overview
+
+Monorepo with two independent packages (no root package.json):
+
+```
+vector-fiscal/
+├── backend/          Express 4 REST API + Mongoose 8
+├── frontend/         Vue 3 SPA + Vite 5 + Tailwind 3
+├── doc/              Documentation
+├── render.yaml       Render deploy blueprint
+└── .gitignore
+```
+
+## Tech stack
+
+### Backend (`backend/`)
+- **Runtime:** Node.js >= 18
+- **Framework:** Express 4.18
+- **Database:** MongoDB 6+ via Mongoose 8
+- **Auth:** JWT (jsonwebtoken 9) + bcryptjs 3
+- **Dev tooling:** nodemon 3
+
+### Frontend (`frontend/`)
+- **Framework:** Vue 3.3 (Composition API, `<script setup>`)
+- **Build:** Vite 5
+- **Routing:** Vue Router 4
+- **HTTP client:** Axios 1.6
+- **Styling:** Tailwind CSS 3 (utility-first)
+- **Fonts:** Playfair Display, Source Sans 3, JetBrains Mono (Google Fonts)
+
+## Running locally
+
+Prerequisites: Node 18+, MongoDB running (Herd uses port 27020).
+
+```bash
+# 1. Backend
+cd backend
+cp .env.example .env   # or create manually
+npm install
+npm run dev            # nodemon on port 3000
+
+# 2. Frontend
+cd frontend
+npm install
+npm run dev            # Vite on port 5173, proxies /api → :3000
+```
+
+### Backend .env variables
+
+| Variable       | Default / Notes                                  |
+|----------------|--------------------------------------------------|
+| PORT           | 3000                                             |
+| MONGODB_URI    | mongodb://127.0.0.1:27020/vector-fiscal (Herd)   |
+| JWT_SECRET     | Required — any strong random string              |
+| JWT_EXPIRES_IN | 30d                                              |
+| FRONTEND_URL   | http://localhost:5173 (CORS origin in production) |
+| NODE_ENV       | development                                      |
+
+### Seed data
+
+```bash
+# Create the initial admin user
+cd backend
+MONGODB_URI="mongodb://127.0.0.1:27020/vector-fiscal" node scripts/createAdmin.js
+```
+
+Default admin: NIT `90121542264`, password `90121542264`, role `admin`.
+
+## Database models
+
+### User
+| Field    | Type   | Notes                          |
+|----------|--------|--------------------------------|
+| nit      | String | Unique, required               |
+| name     | String | Required                       |
+| password | String | Hashed with bcrypt on pre-save |
+| role     | String | `user` or `admin`              |
+
+### Obligation
+| Field       | Type   | Notes                                    |
+|-------------|--------|------------------------------------------|
+| user        | ObjectId | Ref → User                             |
+| barcode     | String | Unique per user                          |
+| tributeCode | String | ONAT code (e.g. 0114022)                |
+| description | String |                                          |
+| amount      | Number |                                          |
+| dueDate     | Date   |                                          |
+| period      | String |                                          |
+| periodicity | String | `mensual`, `trimestral`, `anual`         |
+| status      | String | `pendiente`, `pagado`, `vencido`         |
+| fiscalYear  | Number |                                          |
+| conditional | Boolean|                                          |
+
+### Payment
+| Field         | Type     | Notes                              |
+|---------------|----------|------------------------------------|
+| user          | ObjectId | Ref → User                         |
+| obligation    | ObjectId | Ref → Obligation                   |
+| amount        | Number   |                                    |
+| paymentDate   | Date     |                                    |
+| paymentMethod | String   | Enum of payment methods            |
+| bonusApplied  | Boolean  |                                    |
+| bonusAmount   | Number   |                                    |
+| reference     | String   |                                    |
+| notes         | String   |                                    |
+
+### Income
+| Field              | Type     | Notes                          |
+|--------------------|----------|--------------------------------|
+| user               | ObjectId | Ref → User                     |
+| month              | Number   | 1–12                           |
+| year               | Number   |                                |
+| grossIncome        | Number   |                                |
+| deductibleExpenses | Number   |                                |
+| netIncome          | Number   | Computed on save               |
+| salesTax           | Number   |                                |
+| personalIncomeTax  | Number   |                                |
+| notes              | String   |                                |
+
+Unique index: `{ user, month, year }`.
+
+### Alert
+| Field      | Type     | Notes                                  |
+|------------|----------|----------------------------------------|
+| obligation | ObjectId | Ref → Obligation                       |
+| type       | String   | Enum of alert types                    |
+| message    | String   |                                        |
+| daysBefore | Number   |                                        |
+| isRead     | Boolean  |                                        |
+| alertDate  | Date     |                                        |
+
+**Note:** Alert has no `user` field — alerts are tied to obligations only.
+
+## API routes
+
+All routes are prefixed with `/api`. Auth routes are public; everything else
+requires `Authorization: Bearer <jwt>`.
+
+### Auth (`/api/auth`)
+| Method | Path       | Description          |
+|--------|------------|----------------------|
+| POST   | /register  | Create new user      |
+| POST   | /login     | Returns JWT + user   |
+| GET    | /me        | Current user profile |
+| PUT    | /profile   | Update name / NIT    |
+| PUT    | /password  | Change password      |
+
+### Obligations (`/api/obligations`) — auth required
+| Method | Path       | Description                      |
+|--------|------------|----------------------------------|
+| GET    | /          | List user's obligations          |
+| GET    | /upcoming  | Due within 30 days               |
+| GET    | /overdue   | Overdue items (marks as vencido) |
+| GET    | /summary   | Year summary with amounts        |
+| POST   | /import    | Import RC-04A 2025 template      |
+| POST   | /          | Create obligation                |
+| PUT    | /:id       | Update obligation                |
+| DELETE | /:id       | Delete obligation                |
+
+### Payments (`/api/payments`) — auth required
+| Method | Path     | Description                      |
+|--------|----------|----------------------------------|
+| GET    | /        | List with populated obligation   |
+| GET    | /summary | Payment stats                    |
+| POST   | /        | Record payment (bonus modes)     |
+| PUT    | /:id     | Update payment                   |
+| DELETE | /:id     | Delete + revert obligation status|
+
+### Incomes (`/api/incomes`) — auth required
+| Method | Path           | Description              |
+|--------|----------------|--------------------------|
+| GET    | /              | List all incomes         |
+| GET    | /summary       | Annual summary           |
+| GET    | /:month/:year  | Specific month           |
+| POST   | /              | Upsert month (+ tax calc)|
+| DELETE | /:month/:year  | Delete month record      |
+
+### Calculator (`/api/calculator`) — auth required
+| Method | Path            | Description              |
+|--------|-----------------|--------------------------|
+| POST   | /monthly        | Monthly tax calculation  |
+| POST   | /annual         | Annual tax calculation   |
+| POST   | /income-advance | Aporte 0510122           |
+| POST   | /bonus          | Bonus calculation        |
+| GET    | /rates          | Current tax rates        |
+
+### Alerts (`/api/alerts`) — auth required
+| Method | Path       | Description              |
+|--------|------------|--------------------------|
+| GET    | /          | All alerts               |
+| GET    | /summary   | Alert stats              |
+| POST   | /generate  | Generate from obligations|
+| PUT    | /read-all  | Mark all as read         |
+| PUT    | /:id/read  | Mark one as read         |
+| DELETE | /:id       | Delete alert             |
+
+### Predictions (`/api/predictions`) — auth required
+| Method | Path                 | Description              |
+|--------|----------------------|--------------------------|
+| GET    | /income              | Income prediction        |
+| GET    | /taxes               | Tax estimation           |
+| GET    | /cashflow            | Monthly cash flow        |
+| GET    | /insights            | Dashboard insights       |
+| GET    | /summary             | Aggregated summary       |
+| GET    | /annual-declaration  | DJ-08 declaration data   |
+| POST   | /calculate           | Custom estimate          |
+
+### Users (`/api/users`) — admin only
+| Method | Path   | Description              |
+|--------|--------|--------------------------|
+| GET    | /      | Paginated list + search  |
+| GET    | /stats | Global system stats      |
+| GET    | /:id   | User detail + aggregates |
+| POST   | /      | Create user              |
+| PUT    | /:id   | Update user              |
+| DELETE | /:id   | Delete + cascade data    |
+
+### Health check
+`GET /api/health` — public, returns DB status and document counts.
+
+## Frontend views
+
+| View                    | Route              | Description                                 |
+|-------------------------|--------------------|---------------------------------------------|
+| Login.vue               | /login             | NIT + password form                         |
+| Register.vue            | /register          | New user registration                       |
+| Dashboard.vue           | /                  | Progress ring, KPIs, upcoming, insights     |
+| Calendar.vue            | /calendar          | Monthly grid with obligation markers        |
+| Calculator.vue          | /calculator        | Tax calculation form + results              |
+| Payments.vue            | /payments          | Payment CRUD, KPIs, bonus modes             |
+| Incomes.vue             | /incomes           | 12-month income grid + stats                |
+| CashFlow.vue            | /cashflow          | Cash flow projections + insights            |
+| DeclaracionJurada.vue   | /declaracion       | DJ-08 annual tax declaration                |
+| Reports.vue             | /reports           | Fiscal summary, printable/PDF               |
+| Profile.vue             | /profile           | Edit name/NIT/password                      |
+| Users.vue               | /users             | Admin panel: user CRUD                      |
+
+### Components
+| Component         | Used in     | Purpose                           |
+|-------------------|-------------|-----------------------------------|
+| InsightsPanel.vue | Dashboard   | Typed insight cards with actions  |
+| AlertsPanel.vue   | (unused)    | Alert dropdown (not integrated)   |
+
+## Tax calculation rules (ONAT 2025)
+
+Defined in `backend/src/utils/taxCalculator.js`:
+
+| Code    | Tax                                | Rate / Amount                  |
+|---------|------------------------------------|--------------------------------|
+| 0114022 | Impuesto sobre ventas y servicios  | 10% of gross income            |
+| 0510122 | Aporte a cuenta ingresos personales| 3% of income above 3,260 CUP   |
+| 0820132 | Pago trimestral                    | 1,200 CUP fixed                |
+
+### Bonuses
+| Type          | Discount | Condition                    |
+|---------------|----------|------------------------------|
+| Early payment | 5%       | Before due date              |
+| Transfermóvil | 3%       | Using Transfermóvil          |
+| Combined      | 8%       | Both conditions              |
+
+## Design system
+
+- **Theme:** Dark background with emerald green accents
+- **Colors:** Custom `onat` and `fiscal` palettes in Tailwind config
+- **Typography:** Playfair Display (headings), Source Sans 3 (body), JetBrains Mono (code/numbers)
+- **Layout:** Sidebar navigation + header with dynamic title and notifications
+
+## Deployment (Render)
+
+Defined in `render.yaml`:
+- **mionat-api**: Web service from `backend/`, `npm start`
+- **mionat-web**: Web service from `frontend/`, builds with Vite, served with `serve -s dist`
+- MongoDB via Atlas (external)
+
+## Scripts
+
+| Script                        | Purpose                                |
+|-------------------------------|----------------------------------------|
+| `scripts/createAdmin.js`      | Create or promote admin user           |
+| `scripts/migrateUserData.js`  | Reassign all data to a specific user   |
+
+## Known issues / technical debt
+
+1. **Alert model lacks `user` field** — alerts are global, not tenant-isolated.
+   Any authenticated user can see/generate alerts for all obligations.
+2. **Hardcoded credentials** in migration and seed scripts (Atlas URIs with
+   passwords in clear text).
+3. **Income `netIncome` inconsistency** — model pre-save computes
+   `gross - deductible`, but the controller assigns `gross - salesTax`.
+4. **Reports.vue** has hardcoded user name/NIT in the print header instead of
+   using the authenticated user's data.
+5. **Tax rate text mismatch** — `taxCalculator.js` uses 3% for income advance,
+   but the `/rates` endpoint text says 5%.
+
+## File-by-file reference
+
+### Backend
+```
+backend/
+├── package.json
+├── src/
+│   ├── index.js                    # Express app, CORS, routes, health, static
+│   ├── config/
+│   │   └── database.js             # Mongoose connection
+│   ├── middleware/
+│   │   └── auth.js                 # JWT generation, auth & adminOnly guards
+│   ├── models/
+│   │   ├── index.js                # Re-exports all models
+│   │   ├── User.js
+│   │   ├── Obligation.js
+│   │   ├── Payment.js
+│   │   ├── Income.js
+│   │   └── Alert.js
+│   ├── controllers/
+│   │   ├── usersController.js      # Admin CRUD + stats
+│   │   ├── obligationsController.js # Obligations + import RC-04A
+│   │   ├── paymentsController.js   # Payments + bonus logic
+│   │   ├── incomesController.js    # Income upsert + tax calc
+│   │   ├── alertsController.js     # Alert generation + management
+│   │   └── predictionsController.js # Predictions, cashflow, DJ-08
+│   ├── routes/
+│   │   ├── auth.js
+│   │   ├── users.js
+│   │   ├── obligations.js
+│   │   ├── payments.js
+│   │   ├── incomes.js
+│   │   ├── calculator.js
+│   │   ├── alerts.js
+│   │   └── predictions.js
+│   └── utils/
+│       ├── taxCalculator.js        # ONAT 2025 rates and formulas
+│       └── predictionsService.js   # Weighted avg, trends, seasonality
+└── scripts/
+    ├── createAdmin.js
+    └── migrateUserData.js
+```
+
+### Frontend
+```
+frontend/
+├── package.json
+├── index.html
+├── vite.config.js                  # Proxy /api → :3000
+├── tailwind.config.js              # onat/fiscal colors, fonts
+├── postcss.config.js
+└── src/
+    ├── main.js                     # Vue app + router + auth guard
+    ├── App.vue                     # Shell: sidebar, header, notifications
+    ├── style.css                   # Tailwind directives + custom utilities
+    ├── services/
+    │   └── api.js                  # Axios instance + all API modules
+    ├── views/
+    │   ├── Login.vue
+    │   ├── Register.vue
+    │   ├── Dashboard.vue
+    │   ├── Calendar.vue
+    │   ├── Calculator.vue
+    │   ├── Payments.vue
+    │   ├── Incomes.vue
+    │   ├── CashFlow.vue
+    │   ├── DeclaracionJurada.vue
+    │   ├── Reports.vue
+    │   ├── Profile.vue
+    │   └── Users.vue
+    └── components/
+        ├── InsightsPanel.vue
+        └── AlertsPanel.vue
+```

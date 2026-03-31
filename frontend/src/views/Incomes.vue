@@ -5,7 +5,7 @@
       <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
           <h2 class="text-2xl font-display font-bold text-white mb-2">
-            <span class="text-blue-400">💰</span> Registro de Ingresos 2025
+            <span class="text-blue-400">💰</span> Registro de Ingresos {{ currentFiscalYear }}
           </h2>
           <p class="text-slate-400">Control de tus ingresos mensuales para cálculo de impuestos</p>
         </div>
@@ -268,6 +268,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { incomesApi } from '../services/api'
 
+const currentFiscalYear = new Date().getFullYear()
 const loading = ref(true)
 const saving = ref(false)
 const ingresos = ref([])
@@ -371,7 +372,7 @@ async function guardarIngreso() {
   try {
     await incomesApi.upsert({
       month: editingMes.value.numero,
-      year: 2025,
+      year: currentFiscalYear,
       grossIncome: formIngreso.value,
       notes: formNotas.value
     })
@@ -389,7 +390,7 @@ async function eliminarIngreso() {
   
   saving.value = true
   try {
-    await incomesApi.delete(editingMes.value.numero, 2025)
+    await incomesApi.delete(editingMes.value.numero, currentFiscalYear)
     await loadData()
     closeModal()
   } catch (error) {
@@ -402,7 +403,7 @@ async function eliminarIngreso() {
 async function loadData() {
   loading.value = true
   try {
-    const res = await incomesApi.getAll({ year: 2025 })
+    const res = await incomesApi.getAll({ year: currentFiscalYear })
     // Mapear grossIncome a amount para compatibilidad con el resto del código
     ingresos.value = res.data.map(ing => ({
       ...ing,

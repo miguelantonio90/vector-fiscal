@@ -1,6 +1,15 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const controller = require('../controllers/obligationsController');
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    cb(null, file.mimetype === 'application/pdf');
+  }
+});
 
 // GET /api/obligations - Obtener todas las obligaciones
 router.get('/', controller.getAll);
@@ -14,7 +23,10 @@ router.get('/overdue', controller.getOverdue);
 // GET /api/obligations/summary - Resumen de obligaciones
 router.get('/summary', controller.getSummary);
 
-// POST /api/obligations/import - Importar Vector Fiscal 2025
+// POST /api/obligations/import-pdf - Importar desde PDF del Vector Fiscal
+router.post('/import-pdf', upload.single('vectorFiscal'), controller.importFromPDF);
+
+// POST /api/obligations/import - Importar Vector Fiscal 2025 (fallback plantilla)
 router.post('/import', controller.importVectorFiscal2025);
 
 // GET /api/obligations/:id - Obtener una obligación

@@ -8,8 +8,7 @@
       </div>
       <div class="flex items-center gap-3">
         <select v-model="selectedYear" class="input w-32 text-sm py-2">
-          <option :value="2025">2025</option>
-          <option :value="2026">2026</option>
+          <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
         </select>
         <button @click="printReport" class="btn bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -595,7 +594,8 @@
 import { ref, computed, onMounted, watch, h } from 'vue'
 import { obligationsApi, paymentsApi, incomesApi, predictionsApi } from '../services/api'
 
-const selectedYear = ref(2025)
+const selectedYear = ref(new Date().getFullYear())
+const yearOptions = [new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1]
 const loading = ref(true)
 const obligationsSummary = ref({ pending: 0, paid: 0, overdue: 0, total: 0, totalAmount: 0, paidAmount: 0, avgMonthlyPayment: 0 })
 const paymentsSummary = ref({ totalPaid: 0, totalBonus: 0, totalPayments: 0, byMonth: [], byMethod: [] })

@@ -65,8 +65,15 @@ export const obligationsApi = {
   delete: (id) => api.delete(`/obligations/${id}`),
   getUpcoming: () => api.get('/obligations/upcoming'),
   getOverdue: () => api.get('/obligations/overdue'),
-  getSummary: (year = 2025) => api.get('/obligations/summary', { params: { year } }),
-  importVectorFiscal: () => api.post('/obligations/import')
+  getSummary: (year = new Date().getFullYear()) => api.get('/obligations/summary', { params: { year } }),
+  importVectorFiscal: () => api.post('/obligations/import'),
+  importFromPDF: (file) => {
+    const formData = new FormData()
+    formData.append('vectorFiscal', file)
+    return api.post('/obligations/import-pdf', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  }
 }
 
 // Payments API
@@ -76,7 +83,7 @@ export const paymentsApi = {
   create: (data) => api.post('/payments', data),
   update: (id, data) => api.put(`/payments/${id}`, data),
   delete: (id) => api.delete(`/payments/${id}`),
-  getSummary: (year = 2025) => api.get('/payments/summary', { params: { year } })
+  getSummary: (year = new Date().getFullYear()) => api.get('/payments/summary', { params: { year } })
 }
 
 // Incomes API
@@ -85,7 +92,7 @@ export const incomesApi = {
   getByMonthYear: (month, year) => api.get(`/incomes/${month}/${year}`),
   upsert: (data) => api.post('/incomes', data),
   delete: (month, year) => api.delete(`/incomes/${month}/${year}`),
-  getAnnualSummary: (year = 2025) => api.get('/incomes/summary', { params: { year } })
+  getAnnualSummary: (year = new Date().getFullYear()) => api.get('/incomes/summary', { params: { year } })
 }
 
 // Calculator API

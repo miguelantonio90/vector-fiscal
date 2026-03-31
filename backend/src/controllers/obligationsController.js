@@ -1,4 +1,5 @@
 const { Obligation } = require('../models');
+const { parseVectorFiscalPDF } = require('../utils/vectorFiscalParser');
 
 // Obtener todas las obligaciones del usuario actual
 exports.getAll = async (req, res) => {
@@ -213,10 +214,65 @@ exports.importVectorFiscal2025 = async (req, res) => {
   }
 };
 
+// Importar obligaciones desde un PDF del Vector Fiscal RC-04A (cualquier año)
+exports.importFromPDF = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Debe subir un archivo PDF' });
+    }
+
+    if (req.file.mimetype !== 'application/pdf') {
+      return res.status(400).json({ error: 'El archivo debe ser un PDF' });
+    }
+
+    const { obligations, fiscalYear, totalFound } = await parseVectorFiscalPDF(req.file.buffer);
+
+    if (totalFound === 0) {
+      return res.status(400).json({ 
+        error: 'No se encontraron obligaciones en el PDF. Verifique que sea un Vector Fiscal RC-04A válido.' 
+      });
+    }
+
+    const results = [];
+    for (const data of obligations) {
+      const existing = await Obligation.findOne({
+        barcode: data.barcode,
+        user: req.user._id
+      });
+      if (!existing) {
+        const obligation = new Obligation({
+          ...data,
+          user: req.user._id,
+          fiscalYear,
+          status: 'pendiente'
+        });
+        await obligation.save();
+        results.push({ barcode: data.barcode, action: 'created' });
+      } else {
+        results.push({ barcode: data.barcode, action: 'exists' });
+      }
+    }
+
+    const created = results.filter(r => r.action === 'created').length;
+    const existed = results.filter(r => r.action === 'exists').length;
+
+    res.json({
+      message: `Vector Fiscal ${fiscalYear} importado desde PDF`,
+      fiscalYear,
+      total: totalFound,
+      created,
+      existed,
+      results
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // Resumen de obligaciones del usuario actual
 exports.getSummary = async (req, res) => {
   try {
-    const year = parseInt(req.query.year) || 2025;
+    const year = parseInt(req.query.year) || new Date().getFullYear();
     const userId = req.user._id;
     
     // Excluir obligaciones con status 'no_aplica' de todos los conteos

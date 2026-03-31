@@ -238,7 +238,7 @@ const user = ref(null)
 // Cargar obligaciones pendientes
 const loadPendingObligations = async () => {
   try {
-    const response = await obligationsApi.getAll({ status: 'pendiente', year: 2025 })
+    const response = await obligationsApi.getAll({ status: 'pendiente', year: new Date().getFullYear() })
     // Filtrar solo las que tienen fecha de vencimiento en los próximos 60 días
     const now = new Date()
     const sixtyDaysLater = new Date()

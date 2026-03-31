@@ -228,32 +228,69 @@
 
     <!-- Actions Card -->
     <div class="mt-6 bg-slate-800/50 backdrop-blur-xl rounded-2xl border border-slate-700/50 p-8">
-      <h3 class="text-lg font-semibold text-white mb-6">Acciones de Cuenta</h3>
+      <h3 class="text-lg font-semibold text-white mb-6">Importar Vector Fiscal</h3>
       
       <div class="space-y-4">
-        <!-- Importar MiONAT -->
+        <!-- Upload PDF -->
+        <div
+          @dragover.prevent="isDragging = true"
+          @dragleave.prevent="isDragging = false"
+          @drop.prevent="handleDrop"
+          @click="$refs.pdfInput.click()"
+          :class="[
+            'relative w-full p-6 rounded-xl border-2 border-dashed cursor-pointer transition-all',
+            isDragging
+              ? 'border-emerald-400 bg-emerald-500/10'
+              : 'border-slate-600 hover:border-emerald-500/50 hover:bg-emerald-500/5'
+          ]"
+        >
+          <input
+            ref="pdfInput"
+            type="file"
+            accept="application/pdf"
+            class="hidden"
+            @change="handleFileSelect"
+          />
+          <div class="flex flex-col items-center gap-3 text-center">
+            <div class="w-14 h-14 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+              <svg v-if="!importing" class="w-7 h-7 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <svg v-else class="w-7 h-7 text-emerald-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </div>
+            <div>
+              <p class="font-medium text-white">
+                {{ importing ? 'Procesando PDF...' : selectedFile ? selectedFile.name : 'Subir PDF del Vector Fiscal RC-04A' }}
+              </p>
+              <p class="text-sm text-slate-400 mt-1">
+                {{ importing ? 'Extrayendo obligaciones...' : 'Arrastra el PDF aquí o haz clic para seleccionar' }}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fallback: plantilla 2025 -->
         <button 
-          @click="importVectorFiscal"
+          @click="importVectorFiscalTemplate"
           :disabled="importing"
-          class="w-full flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-slate-700/50 hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all group"
+          class="w-full flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-slate-700/50 hover:border-slate-500/50 hover:bg-slate-700/20 transition-all group"
         >
           <div class="flex items-center gap-4">
-            <div class="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center group-hover:bg-emerald-500/30 transition-colors">
-              <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            <div class="w-10 h-10 rounded-lg bg-slate-700/50 flex items-center justify-center">
+              <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
             <div class="text-left">
-              <p class="font-medium text-white">Importar MiONAT 2025</p>
-              <p class="text-sm text-slate-400">Cargar obligaciones del año fiscal actual</p>
+              <p class="text-sm font-medium text-slate-300">Usar plantilla 2025</p>
+              <p class="text-xs text-slate-500">Cargar obligaciones predeterminadas sin PDF</p>
             </div>
           </div>
-          <svg v-if="!importing" class="w-5 h-5 text-slate-400 group-hover:text-emerald-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-4 h-4 text-slate-500 group-hover:text-slate-300 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-          </svg>
-          <svg v-else class="w-5 h-5 text-emerald-400 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
         </button>
       </div>
@@ -268,7 +305,13 @@
           </svg>
         </div>
         <h3 class="text-xl font-bold text-white mb-2">¡Importación Exitosa!</h3>
-        <p class="text-slate-400 mb-6">Se han importado {{ importResult.created }} obligaciones para el año fiscal 2025.</p>
+        <p class="text-slate-400 mb-4">
+          Se han importado <span class="text-emerald-400 font-semibold">{{ importResult.created }}</span> obligaciones
+          para el año fiscal <span class="text-emerald-400 font-semibold">{{ importResult.fiscalYear }}</span>.
+        </p>
+        <p v-if="importResult.existed > 0" class="text-slate-500 text-sm mb-6">
+          {{ importResult.existed }} obligaciones ya existían y no se duplicaron.
+        </p>
         <button 
           @click="showImportSuccess = false"
           class="px-6 py-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors"
@@ -310,11 +353,13 @@ const savingProfile = ref(false)
 const savingPassword = ref(false)
 const importing = ref(false)
 const showImportSuccess = ref(false)
-const importResult = ref({ created: 0 })
+const importResult = ref({ created: 0, fiscalYear: '', existed: 0 })
 const successMessage = ref('')
 const errorMessage = ref('')
 const showCurrentPassword = ref(false)
 const showNewPassword = ref(false)
+const isDragging = ref(false)
+const selectedFile = ref(null)
 
 const userInitials = computed(() => {
   if (!user.value?.name) return 'U'
@@ -359,8 +404,8 @@ const loadProfile = async () => {
 const loadStats = async () => {
   try {
     const [obligationsSummary, paymentsSummary] = await Promise.all([
-      obligationsApi.getSummary(2025),
-      paymentsApi.getSummary(2025)
+      obligationsApi.getSummary(),
+      paymentsApi.getSummary()
     ])
     
     stats.value = {
@@ -428,12 +473,51 @@ const changePassword = async () => {
   }
 }
 
-const importVectorFiscal = async () => {
+const handleFileSelect = (event) => {
+  const file = event.target.files[0]
+  if (file) uploadPDF(file)
+}
+
+const handleDrop = (event) => {
+  isDragging.value = false
+  const file = event.dataTransfer.files[0]
+  if (file && file.type === 'application/pdf') {
+    uploadPDF(file)
+  } else {
+    errorMessage.value = 'Solo se aceptan archivos PDF'
+  }
+}
+
+const uploadPDF = async (file) => {
+  clearMessages()
+  selectedFile.value = file
+  importing.value = true
+  try {
+    const response = await obligationsApi.importFromPDF(file)
+    importResult.value = {
+      created: response.data.created || 0,
+      existed: response.data.existed || 0,
+      fiscalYear: response.data.fiscalYear || ''
+    }
+    showImportSuccess.value = true
+    await loadStats()
+  } catch (error) {
+    console.error('Error importing PDF:', error)
+    errorMessage.value = error.response?.data?.error || 'Error al procesar el PDF'
+  } finally {
+    importing.value = false
+    selectedFile.value = null
+  }
+}
+
+const importVectorFiscalTemplate = async () => {
+  clearMessages()
   importing.value = true
   try {
     const response = await obligationsApi.importVectorFiscal()
     const created = response.data.results?.filter(r => r.action === 'created').length || 0
-    importResult.value = { created }
+    const existed = response.data.results?.filter(r => r.action === 'exists').length || 0
+    importResult.value = { created, existed, fiscalYear: 2025 }
     showImportSuccess.value = true
     await loadStats()
   } catch (error) {

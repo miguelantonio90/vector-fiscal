@@ -4,7 +4,7 @@
     <div class="card bg-gradient-to-r from-slate-800/80 to-slate-900/80 border-slate-700/50">
       <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
         <div>
-          <h2 class="text-2xl font-display font-bold text-white mb-2">Resumen Fiscal 2025</h2>
+          <h2 class="text-2xl font-display font-bold text-white mb-2">Resumen Fiscal {{ currentFiscalYear }}</h2>
           <p class="text-slate-400">Progreso de tus obligaciones tributarias</p>
         </div>
         
@@ -58,7 +58,7 @@
       <div class="card border-l-4 border-l-onat-red">
         <div class="flex items-start justify-between">
           <div>
-            <p class="text-slate-400 text-sm">Total Obligaciones 2025</p>
+            <p class="text-slate-400 text-sm">Total Obligaciones {{ currentFiscalYear }}</p>
             <p class="text-2xl font-display font-bold text-white mt-1">
               {{ formatCurrency(summary.totalAmount) }}
             </p>
@@ -399,13 +399,15 @@ function showToast(message, type = 'success') {
   }, 3000)
 }
 
+const currentFiscalYear = new Date().getFullYear()
+
 async function loadData() {
   loading.value = true
   try {
     const [obligationsRes, summaryRes, paymentsSummaryRes] = await Promise.all([
       obligationsApi.getAll(),
-      obligationsApi.getSummary(2025),
-      paymentsApi.getSummary(2025)
+      obligationsApi.getSummary(),
+      paymentsApi.getSummary()
     ])
     allObligations.value = obligationsRes.data
     summary.value = summaryRes.data

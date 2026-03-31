@@ -29,8 +29,7 @@
           v-model="currentYear" 
           class="input w-24 text-sm py-2"
         >
-          <option :value="2025">2025</option>
-          <option :value="2026">2026</option>
+          <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
         </select>
       </div>
     </div>
@@ -220,7 +219,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { obligationsApi } from '../services/api'
 
 const currentMonth = ref(new Date().getMonth())
-const currentYear = ref(2025)
+const currentYear = ref(new Date().getFullYear())
+const yearOptions = [new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1]
 const obligations = ref([])
 const selectedObligation = ref(null)
 const loading = ref(true)
