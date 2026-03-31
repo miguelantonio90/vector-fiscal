@@ -53,39 +53,25 @@ exports.create = async (req, res) => {
       return res.status(404).json({ error: 'Obligación no encontrada' });
     }
     
+    // amount = valor real del impuesto (antes de bonificación)
+    // bonusAmount = ahorro por canal/anticipación (no altera el valor fiscal)
     let bonusApplied = 0;
     let bonusAmount = 0;
-    let finalAmount = amount;
     
-    if (bonusMode === 'none') {
-      // Sin bonificación - guardar el monto tal cual
-      bonusApplied = 0;
-      bonusAmount = 0;
-      finalAmount = amount;
-    } else if (bonusMode === 'already') {
-      // El monto ingresado ya es el final, y el usuario indica cuánto ahorró en pesos
+    if (bonusMode === 'already') {
       bonusAmount = bonusAmountSaved || 0;
-      // Calcular el porcentaje basado en el monto original (amount + bonusAmount)
-      const originalAmount = amount + bonusAmount;
-      if (originalAmount > 0 && bonusAmount > 0) {
-        bonusApplied = (bonusAmount / originalAmount) * 100;
+      if (amount > 0 && bonusAmount > 0) {
+        bonusApplied = (bonusAmount / amount) * 100;
       }
-      finalAmount = amount;
     } else if (bonusMode === 'calculate') {
-      // Calcular bonificaciones automáticamente
-      // Bonificación del 3% por Transfermóvil
       if (paymentMethod === 'transfermovil') {
         bonusApplied += 3;
       }
-      
-      // Bonificación del 5% por pago anticipado (antes de fecha límite)
       const pDate = new Date(paymentDate || Date.now());
       if (pDate < new Date(obligation.dueDate)) {
         bonusApplied += 5;
       }
-      
       bonusAmount = (amount * bonusApplied) / 100;
-      finalAmount = amount - bonusAmount;
     }
     
     const pDate = new Date(paymentDate || Date.now());
@@ -93,7 +79,7 @@ exports.create = async (req, res) => {
     const payment = new Payment({
       user: req.user._id,
       obligation: obligationId,
-      amount: finalAmount,
+      amount,
       paymentDate: pDate,
       paymentMethod,
       bonusApplied,
@@ -104,18 +90,18 @@ exports.create = async (req, res) => {
     
     await payment.save();
     
-    // Actualizar estado de la obligación
+    // Actualizar estado y monto real de la obligación
     obligation.status = 'pagado';
-    obligation.amount = finalAmount;
+    obligation.amount = amount;
     await obligation.save();
     
     res.status(201).json({
       payment,
       bonusInfo: {
-        originalAmount: amount,
+        amount,
         bonusApplied: `${bonusApplied}%`,
         bonusAmount,
-        finalAmount
+        actualPaid: amount - bonusAmount
       }
     });
   } catch (error) {
@@ -127,8 +113,6 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const { amount, paymentDate, paymentMethod, reference, notes, bonusMode, bonusAmountSaved } = req.body;
-    
-    console.log('Update payment received:', { amount, paymentDate, paymentMethod, bonusMode, bonusAmountSaved });
     
     const payment = await Payment.findOne({
       _id: req.params.id,
@@ -143,39 +127,24 @@ exports.update = async (req, res) => {
     
     let bonusApplied = 0;
     let bonusAmount = 0;
-    let finalAmount = amount;
     
-    if (bonusMode === 'none') {
-      // Sin bonificación - guardar el monto tal cual
-      bonusApplied = 0;
-      bonusAmount = 0;
-      finalAmount = amount;
-    } else if (bonusMode === 'already') {
-      // El monto ingresado ya es el final, y el usuario indica cuánto ahorró en pesos
+    if (bonusMode === 'already') {
       bonusAmount = bonusAmountSaved || 0;
-      // Calcular el porcentaje basado en el monto original (amount + bonusAmount)
-      const originalAmount = amount + bonusAmount;
-      if (originalAmount > 0 && bonusAmount > 0) {
-        bonusApplied = (bonusAmount / originalAmount) * 100;
+      if (amount > 0 && bonusAmount > 0) {
+        bonusApplied = (bonusAmount / amount) * 100;
       }
-      finalAmount = amount;
     } else if (bonusMode === 'calculate') {
-      // Calcular bonificaciones automáticamente
       if (paymentMethod === 'transfermovil') {
         bonusApplied += 3;
       }
-      
       const pDate = new Date(paymentDate || Date.now());
       if (obligation && pDate < new Date(obligation.dueDate)) {
         bonusApplied += 5;
       }
-      
       bonusAmount = (amount * bonusApplied) / 100;
-      finalAmount = amount - bonusAmount;
     }
     
-    // Actualizar el pago
-    payment.amount = finalAmount;
+    payment.amount = amount;
     payment.paymentDate = new Date(paymentDate);
     payment.paymentMethod = paymentMethod;
     payment.bonusApplied = bonusApplied;
@@ -185,9 +154,8 @@ exports.update = async (req, res) => {
     
     await payment.save();
     
-    // Actualizar el monto en la obligación también
     if (obligation) {
-      obligation.amount = finalAmount;
+      obligation.amount = amount;
       await obligation.save();
     }
     
