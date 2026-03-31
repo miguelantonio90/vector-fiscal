@@ -623,7 +623,7 @@ import { ref, computed, onMounted, watch, h } from 'vue'
 import { obligationsApi, paymentsApi, incomesApi, predictionsApi } from '../services/api'
 
 const selectedYear = ref(new Date().getFullYear())
-const yearOptions = [new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1]
+const yearOptions = [new Date().getFullYear() - 2, new Date().getFullYear() - 1, new Date().getFullYear()]
 const loading = ref(true)
 const filterTribute = ref('')
 const filterMethod = ref('')

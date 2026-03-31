@@ -32,7 +32,15 @@ const userSchema = new mongoose.Schema({
     filename: String,
     data: Buffer,
     uploadedAt: Date,
-    fiscalYear: Number
+    fiscalYear: Number,
+    meta: {
+      fullName: String,
+      dpa: String,
+      rc05: String,
+      nit: String,
+      ci: String,
+      activities: [String]
+    }
   }
 }, {
   timestamps: true

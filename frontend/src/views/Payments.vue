@@ -569,6 +569,8 @@ const sortBy = ref('date-desc')
 const yearOptions = computed(() => {
   const years = new Set(payments.value.map(p => p.obligation?.fiscalYear).filter(Boolean))
   years.add(currentYear)
+  years.add(currentYear - 1)
+  years.add(currentYear - 2)
   return ['', ...Array.from(years).sort((a, b) => b - a)]
 })
 const toast = ref({ show: false, message: '', type: 'success' })

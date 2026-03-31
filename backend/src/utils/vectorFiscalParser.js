@@ -125,17 +125,50 @@ function detectFiscalYear(obligations) {
 }
 
 /**
+ * Extracts header metadata from the PDF text (name, DPA, RC-05, activities).
+ */
+function parseHeaderMeta(text) {
+  const meta = {};
+
+  const nameMatch = text.match(/Nombre y apellidos:\s*(.+)/);
+  if (nameMatch) meta.fullName = nameMatch[1].trim();
+
+  const dpaMatch = text.match(/DPA-Municipio:\s*(.+)/);
+  if (dpaMatch) meta.dpa = dpaMatch[1].trim();
+
+  const rc05Match = text.match(/Código de barras del RC-05[^:]*:\s*(\d+)/);
+  if (rc05Match) meta.rc05 = rc05Match[1].trim();
+
+  const nitMatch = text.match(/NIT:\s*(\d+)/);
+  if (nitMatch) meta.nit = nitMatch[1].trim();
+
+  const ciMatch = text.match(/Carné de identidad:\s*(\d+)/);
+  if (ciMatch) meta.ci = ciMatch[1].trim();
+
+  meta.activities = [];
+  const actSection = text.match(/Actividades\(\d+\)([\s\S]*?)Tributos\(/);
+  if (actSection) {
+    const actLines = actSection[1].match(/\*\s*(.+)/g);
+    if (actLines) {
+      meta.activities = actLines.map(l => l.replace(/^\*\s*/, '').trim());
+    }
+  }
+
+  return meta;
+}
+
+/**
  * Parses a Vector Fiscal RC-04A PDF and returns structured obligation data.
  * @param {Buffer} pdfBuffer
- * @returns {Promise<{obligations: Array, fiscalYear: number, totalFound: number, rawText: string}>}
+ * @returns {Promise<{obligations: Array, fiscalYear: number, totalFound: number, rawText: string, meta: Object}>}
  */
 async function parseVectorFiscalPDF(pdfBuffer) {
   const data = await pdfParse(pdfBuffer);
   const text = data.text;
 
   const obligations = parseObligationLines(text);
+  const meta = parseHeaderMeta(text);
 
-  // Deduplicate by barcode
   const seen = new Set();
   const unique = obligations.filter(ob => {
     if (seen.has(ob.barcode)) return false;
@@ -149,7 +182,8 @@ async function parseVectorFiscalPDF(pdfBuffer) {
     obligations: unique,
     fiscalYear,
     totalFound: unique.length,
-    rawText: text
+    rawText: text,
+    meta
   };
 }
 

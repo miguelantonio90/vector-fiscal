@@ -220,7 +220,7 @@ import { obligationsApi } from '../services/api'
 
 const currentMonth = ref(new Date().getMonth())
 const currentYear = ref(new Date().getFullYear())
-const yearOptions = [new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1]
+const yearOptions = [new Date().getFullYear() - 2, new Date().getFullYear() - 1, new Date().getFullYear()]
 const obligations = ref([])
 const selectedObligation = ref(null)
 const loading = ref(true)

@@ -186,22 +186,36 @@ exports.getVectorFiscal = async (req, res) => {
       };
     });
 
-    const user = await User.findById(userId).select('nit name');
+    const user = await User.findById(userId).select('nit name vectorFiscal.meta vectorFiscal.fiscalYear');
+    const pdfMeta = user.vectorFiscal?.meta || {};
+
     const tributeCodes = [...new Set(obligations.map(o => o.tributeCode))];
     const tributes = tributeCodes.map(code => ({
       code,
       description: tributeDescriptions[code] || code
     }));
 
+    const totalAmountPaid = rows.reduce((sum, r) => sum + (r.paidAmount || 0), 0);
+    const totalBonusSaved = rows.reduce((sum, r) => sum + (r.bonusAmount || 0), 0);
+
     res.json({
       title: 'RC-04A Vector fiscal de persona natural',
-      user: { nit: user.nit, name: user.name },
+      user: {
+        nit: pdfMeta.nit || user.nit,
+        ci: pdfMeta.ci || user.nit,
+        name: pdfMeta.fullName || user.name,
+        dpa: pdfMeta.dpa || '',
+        rc05: pdfMeta.rc05 || ''
+      },
+      activities: pdfMeta.activities || [],
       fiscalYear: year,
       obligations: rows,
       tributes,
       totalObligations: rows.length,
       totalPaid: rows.filter(r => r.paid).length,
-      totalPending: rows.filter(r => !r.paid).length
+      totalPending: rows.filter(r => !r.paid).length,
+      totalAmountPaid,
+      totalBonusSaved
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -219,7 +233,7 @@ exports.importFromPDF = async (req, res) => {
       return res.status(400).json({ error: 'El archivo debe ser un PDF' });
     }
 
-    const { obligations, fiscalYear, totalFound } = await parseVectorFiscalPDF(req.file.buffer);
+    const { obligations, fiscalYear, totalFound, meta } = await parseVectorFiscalPDF(req.file.buffer);
 
     if (totalFound === 0) {
       return res.status(400).json({ 
@@ -227,13 +241,13 @@ exports.importFromPDF = async (req, res) => {
       });
     }
 
-    // Guardar el PDF en el usuario para poder reutilizarlo
     await User.findByIdAndUpdate(req.user._id, {
       vectorFiscal: {
         filename: req.file.originalname,
         data: req.file.buffer,
         uploadedAt: new Date(),
-        fiscalYear
+        fiscalYear,
+        meta
       }
     });
 
@@ -296,10 +310,15 @@ exports.reprocessPDF = async (req, res) => {
       return res.status(404).json({ error: 'No tiene un Vector Fiscal guardado. Suba un PDF primero.' });
     }
 
-    const { obligations, fiscalYear, totalFound } = await parseVectorFiscalPDF(user.vectorFiscal.data);
+    const { obligations, fiscalYear, totalFound, meta } = await parseVectorFiscalPDF(user.vectorFiscal.data);
 
     if (totalFound === 0) {
       return res.status(400).json({ error: 'No se pudieron extraer obligaciones del PDF guardado.' });
+    }
+
+    if (meta && Object.keys(meta).length > 0) {
+      user.vectorFiscal.meta = meta;
+      await user.save();
     }
 
     const results = [];
