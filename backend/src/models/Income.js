@@ -18,7 +18,7 @@ const incomeSchema = new mongoose.Schema({
   year: {
     type: Number,
     required: true,
-    default: 2025
+    default: () => new Date().getFullYear()
   },
   // Ingresos brutos del mes
   grossIncome: {

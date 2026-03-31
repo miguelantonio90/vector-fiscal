@@ -26,8 +26,8 @@ router.get('/summary', controller.getSummary);
 // POST /api/obligations/import-pdf - Importar desde PDF del Vector Fiscal
 router.post('/import-pdf', upload.single('vectorFiscal'), controller.importFromPDF);
 
-// POST /api/obligations/import - Importar Vector Fiscal 2025 (fallback plantilla)
-router.post('/import', controller.importVectorFiscal2025);
+// POST /api/obligations/reprocess - Re-procesar PDF guardado
+router.post('/reprocess', controller.reprocessPDF);
 
 // GET /api/obligations/:id - Obtener una obligación
 router.get('/:id', controller.getById);

@@ -93,7 +93,7 @@ exports.delete = async (req, res) => {
 // Resumen anual de ingresos del usuario actual
 exports.getAnnualSummary = async (req, res) => {
   try {
-    const year = parseInt(req.query.year) || 2025;
+    const year = parseInt(req.query.year) || new Date().getFullYear();
     
     const incomes = await Income.find({ user: req.user._id, year }).sort({ month: 1 });
     

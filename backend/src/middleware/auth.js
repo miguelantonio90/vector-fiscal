@@ -30,8 +30,7 @@ async function auth(req, res, next) {
     // Verificar token
     const decoded = jwt.verify(token, JWT_SECRET);
     
-    // Buscar usuario
-    const user = await User.findById(decoded.id);
+    const user = await User.findById(decoded.id).select('-vectorFiscal.data');
     
     if (!user) {
       return res.status(401).json({ error: 'Usuario no encontrado.' });

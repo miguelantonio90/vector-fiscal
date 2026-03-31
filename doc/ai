@@ -3,9 +3,11 @@
 ## What is this project?
 
 MiONAT (aka vector-fiscal) is a multi-tenant web application for managing tax
-obligations to ONAT (Cuba's tax authority) for fiscal year 2025. Users register
-with their NIT, track monthly/quarterly tax obligations, record payments and
-income, and generate annual tax declarations (DJ-08).
+obligations to ONAT (Cuba's tax authority). Users register with their NIT,
+upload their Vector Fiscal RC-04A PDF for any fiscal year, track
+monthly/quarterly tax obligations, record payments and income, and generate
+annual tax declarations (DJ-08). All year references are dynamic
+(`new Date().getFullYear()`).
 
 ## Architecture overview
 
@@ -27,6 +29,8 @@ vector-fiscal/
 - **Framework:** Express 4.18
 - **Database:** MongoDB 6+ via Mongoose 8
 - **Auth:** JWT (jsonwebtoken 9) + bcryptjs 3
+- **File upload:** multer (memory storage, 5 MB limit)
+- **PDF parsing:** pdf-parse 1.1.1
 - **Dev tooling:** nodemon 3
 
 ### Frontend (`frontend/`)
@@ -78,12 +82,20 @@ Default admin: NIT `90121542264`, password `90121542264`, role `admin`.
 ## Database models
 
 ### User
-| Field    | Type   | Notes                          |
-|----------|--------|--------------------------------|
-| nit      | String | Unique, required               |
-| name     | String | Required                       |
-| password | String | Hashed with bcrypt on pre-save |
-| role     | String | `user` or `admin`              |
+| Field                  | Type   | Notes                                    |
+|------------------------|--------|------------------------------------------|
+| nit                    | String | Unique, required                         |
+| name                   | String | Required                                 |
+| password               | String | Hashed with bcrypt on pre-save           |
+| role                   | String | `user` or `admin`                        |
+| vectorFiscal.filename  | String | Original PDF filename                    |
+| vectorFiscal.data      | Buffer | PDF binary (excluded from toJSON & auth) |
+| vectorFiscal.uploadedAt| Date   | Upload timestamp                         |
+| vectorFiscal.fiscalYear| Number | Detected fiscal year from PDF            |
+
+The `toJSON` method strips `password` and `vectorFiscal.data`. The auth
+middleware uses `.select('-vectorFiscal.data')` to avoid loading the buffer
+on every authenticated request.
 
 ### Obligation
 | Field       | Type   | Notes                                    |
@@ -96,8 +108,8 @@ Default admin: NIT `90121542264`, password `90121542264`, role `admin`.
 | dueDate     | Date   |                                          |
 | period      | String |                                          |
 | periodicity | String | `mensual`, `trimestral`, `anual`         |
-| status      | String | `pendiente`, `pagado`, `vencido`         |
-| fiscalYear  | Number |                                          |
+| status      | String | `pendiente`, `pagado`, `vencido`, `no_aplica` |
+| fiscalYear  | Number | Default: current year                    |
 | conditional | Boolean|                                          |
 
 ### Payment
@@ -118,7 +130,7 @@ Default admin: NIT `90121542264`, password `90121542264`, role `admin`.
 |--------------------|----------|--------------------------------|
 | user               | ObjectId | Ref → User                     |
 | month              | Number   | 1–12                           |
-| year               | Number   |                                |
+| year               | Number   | Default: current year          |
 | grossIncome        | Number   |                                |
 | deductibleExpenses | Number   |                                |
 | netIncome          | Number   | Computed on save               |
@@ -150,21 +162,23 @@ requires `Authorization: Bearer <jwt>`.
 |--------|------------|----------------------|
 | POST   | /register  | Create new user      |
 | POST   | /login     | Returns JWT + user   |
-| GET    | /me        | Current user profile |
+| GET    | /me        | Current user profile (includes vectorFiscal metadata if exists) |
 | PUT    | /profile   | Update name / NIT    |
 | PUT    | /password  | Change password      |
 
 ### Obligations (`/api/obligations`) — auth required
-| Method | Path       | Description                      |
-|--------|------------|----------------------------------|
-| GET    | /          | List user's obligations          |
-| GET    | /upcoming  | Due within 30 days               |
-| GET    | /overdue   | Overdue items (marks as vencido) |
-| GET    | /summary   | Year summary with amounts        |
-| POST   | /import    | Import RC-04A 2025 template      |
-| POST   | /          | Create obligation                |
-| PUT    | /:id       | Update obligation                |
-| DELETE | /:id       | Delete obligation                |
+| Method | Path        | Description                                      |
+|--------|-------------|--------------------------------------------------|
+| GET    | /           | List user's obligations                          |
+| GET    | /upcoming   | Due within 30 days                               |
+| GET    | /overdue    | Overdue items (marks as vencido)                 |
+| GET    | /summary    | Year summary with amounts                        |
+| POST   | /import-pdf | Upload Vector Fiscal PDF → parse + upsert oblig. |
+| POST   | /reprocess  | Re-process saved PDF (no upload needed)          |
+| GET    | /:id        | Get single obligation                            |
+| POST   | /           | Create obligation                                |
+| PUT    | /:id        | Update obligation                                |
+| DELETE | /:id        | Delete obligation                                |
 
 ### Payments (`/api/payments`) — auth required
 | Method | Path     | Description                      |
@@ -241,7 +255,7 @@ requires `Authorization: Bearer <jwt>`.
 | CashFlow.vue            | /cashflow          | Cash flow projections + insights            |
 | DeclaracionJurada.vue   | /declaracion       | DJ-08 annual tax declaration                |
 | Reports.vue             | /reports           | Fiscal summary, printable/PDF               |
-| Profile.vue             | /profile           | Edit name/NIT/password                      |
+| Profile.vue             | /profile           | Edit name/NIT/password + PDF upload/reprocess |
 | Users.vue               | /users             | Admin panel: user CRUD                      |
 
 ### Components
@@ -249,6 +263,29 @@ requires `Authorization: Bearer <jwt>`.
 |-------------------|-------------|-----------------------------------|
 | InsightsPanel.vue | Dashboard   | Typed insight cards with actions  |
 | AlertsPanel.vue   | (unused)    | Alert dropdown (not integrated)   |
+
+## Vector Fiscal PDF import flow
+
+1. User uploads a PDF of the "Vector Fiscal RC-04A" from their ONAT profile.
+2. `multer` receives the file in memory (max 5 MB, PDF only).
+3. `vectorFiscalParser.js` uses `pdf-parse@1.1.1` to extract text, then applies
+   regex patterns to match the concatenated barcode/tribute/period/date format
+   specific to RC-04A documents.
+4. The parser detects the fiscal year from date patterns in the text.
+5. The PDF buffer is stored on `User.vectorFiscal` so it can be re-processed
+   later without re-uploading.
+6. For each parsed obligation, the controller does an **upsert**: creates new
+   ones, updates existing ones (preserves `status: 'pagado'` to avoid
+   overwriting paid obligations' amounts).
+7. The `/reprocess` endpoint re-runs steps 3–6 using the stored PDF.
+
+### Supported tribute codes
+| Code    | Description                                | Periodicity |
+|---------|--------------------------------------------|-------------|
+| 0114022 | Impuesto s/ ventas y servicios (PN)        | mensual     |
+| 0510122 | Aporte a cuenta Imp. Ingresos Personales   | mensual     |
+| 0820132 | Pago trimestral                            | trimestral  |
+| 0530222 | Contribución territorial                   | anual       |
 
 ## Tax calculation rules (ONAT 2025)
 
@@ -300,6 +337,9 @@ Defined in `render.yaml`:
    using the authenticated user's data.
 5. **Tax rate text mismatch** — `taxCalculator.js` uses 3% for income advance,
    but the `/rates` endpoint text says 5%.
+6. **PDF stored in MongoDB** — the Vector Fiscal PDF is stored as a Buffer
+   inside the User document. For large-scale deployments, consider GridFS or
+   external storage (S3/R2).
 
 ## File-by-file reference
 
@@ -322,7 +362,7 @@ backend/
 │   │   └── Alert.js
 │   ├── controllers/
 │   │   ├── usersController.js      # Admin CRUD + stats
-│   │   ├── obligationsController.js # Obligations + import RC-04A
+│   │   ├── obligationsController.js # Obligations + PDF import/upsert/reprocess
 │   │   ├── paymentsController.js   # Payments + bonus logic
 │   │   ├── incomesController.js    # Income upsert + tax calc
 │   │   ├── alertsController.js     # Alert generation + management
@@ -337,7 +377,8 @@ backend/
 │   │   ├── alerts.js
 │   │   └── predictions.js
 │   └── utils/
-│       ├── taxCalculator.js        # ONAT 2025 rates and formulas
+│       ├── taxCalculator.js        # ONAT tax rates and formulas
+│       ├── vectorFiscalParser.js   # PDF text extraction + RC-04A parsing
 │       └── predictionsService.js   # Weighted avg, trends, seasonality
 └── scripts/
     ├── createAdmin.js

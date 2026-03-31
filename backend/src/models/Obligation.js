@@ -52,7 +52,7 @@ const obligationSchema = new mongoose.Schema({
   // Año fiscal
   fiscalYear: {
     type: Number,
-    default: 2025
+    default: () => new Date().getFullYear()
   },
   // Indica si es una obligación condicional (ej: 0510122 solo aplica si ingresos > 3,260)
   conditional: {

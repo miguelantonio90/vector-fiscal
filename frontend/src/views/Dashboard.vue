@@ -309,7 +309,6 @@ import { obligationsApi, paymentsApi, predictionsApi } from '../services/api'
 import InsightsPanel from '../components/InsightsPanel.vue'
 
 const loading = ref(true)
-const importing = ref(false)
 const allObligations = ref([])
 const summary = ref({ pending: 0, paid: 0, overdue: 0, total: 0, totalAmount: 0, paidAmount: 0 })
 const paymentsSummary = ref({ totalPaid: 0, totalBonus: 0, totalPayments: 0 })
@@ -439,19 +438,6 @@ function handleInsightAction(insight) {
   } else if (insight.id === 'heavy-month-alert') {
     // Redirigir a flujo de caja
     window.location.href = '/cash-flow'
-  }
-}
-
-async function importObligations() {
-  importing.value = true
-  try {
-    const res = await obligationsApi.importVectorFiscal()
-    showToast(`MiONAT importado: ${res.data.total} obligaciones`, 'success')
-    await loadData()
-  } catch (error) {
-    showToast('Error al importar: ' + error.message, 'error')
-  } finally {
-    importing.value = false
   }
 }
 

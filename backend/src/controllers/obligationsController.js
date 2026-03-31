@@ -1,4 +1,4 @@
-const { Obligation } = require('../models');
+const { Obligation, User } = require('../models');
 const { parseVectorFiscalPDF } = require('../utils/vectorFiscalParser');
 
 // Obtener todas las obligaciones del usuario actual
@@ -141,79 +141,6 @@ exports.getOverdue = async (req, res) => {
   }
 };
 
-// Importar obligaciones del Vector Fiscal 2025 para el usuario actual
-exports.importVectorFiscal2025 = async (req, res) => {
-  try {
-    // Datos del Vector Fiscal RC-04A 2025
-    // 0114022 (Ventas mensual) + 0510122 (Aporte Ingresos Personales) + 0820132 (Trimestral 1,200 CUP)
-    const vectorFiscalData = [
-      // Impuesto s/ ventas y servicios - MENSUAL (10% sobre ingresos brutos)
-      { barcode: '10015', tributeCode: '0114022', period: 'Enero: 20/Feb/25', dueDate: '2025-02-20', periodicity: 'mensual', description: 'Impuesto s/ ventas y servicios (PN)' },
-      { barcode: '30815', tributeCode: '0114022', period: 'Febrero: 20/Mar/25', dueDate: '2025-03-20', periodicity: 'mensual', description: 'Impuesto s/ ventas y servicios (PN)' },
-      { barcode: '31615', tributeCode: '0114022', period: 'Marzo: 21/Abr/25', dueDate: '2025-04-21', periodicity: 'mensual', description: 'Impuesto s/ ventas y servicios (PN)' },
-      { barcode: '32415', tributeCode: '0114022', period: 'Abril: 20/May/25', dueDate: '2025-05-20', periodicity: 'mensual', description: 'Impuesto s/ ventas y servicios (PN)' },
-      { barcode: '33215', tributeCode: '0114022', period: 'Mayo: 20/Jun/25', dueDate: '2025-06-20', periodicity: 'mensual', description: 'Impuesto s/ ventas y servicios (PN)' },
-      { barcode: '34015', tributeCode: '0114022', period: 'Junio: 21/Jul/25', dueDate: '2025-07-21', periodicity: 'mensual', description: 'Impuesto s/ ventas y servicios (PN)' },
-      { barcode: '54815', tributeCode: '0114022', period: 'Julio: 20/Ago/25', dueDate: '2025-08-20', periodicity: 'mensual', description: 'Impuesto s/ ventas y servicios (PN)' },
-      { barcode: '55615', tributeCode: '0114022', period: 'Agosto: 22/Sep/25', dueDate: '2025-09-22', periodicity: 'mensual', description: 'Impuesto s/ ventas y servicios (PN)' },
-      { barcode: '56415', tributeCode: '0114022', period: 'Septiembre: 20/Oct/25', dueDate: '2025-10-20', periodicity: 'mensual', description: 'Impuesto s/ ventas y servicios (PN)' },
-      { barcode: '57215', tributeCode: '0114022', period: 'Octubre: 20/Nov/25', dueDate: '2025-11-20', periodicity: 'mensual', description: 'Impuesto s/ ventas y servicios (PN)' },
-      { barcode: '58015', tributeCode: '0114022', period: 'Noviembre: 22/Dic/25', dueDate: '2025-12-22', periodicity: 'mensual', description: 'Impuesto s/ ventas y servicios (PN)' },
-      { barcode: '78815', tributeCode: '0114022', period: 'Diciembre: 20/Ene/26', dueDate: '2026-01-20', periodicity: 'mensual', description: 'Impuesto s/ ventas y servicios (PN)' },
-      
-      // Aporte a cuenta Impuesto s/ Ingresos Personales - MENSUAL (3% sobre ingresos > 3,260 CUP)
-      // Solo aplica cuando los ingresos mensuales superan el mínimo exento (3,260 CUP)
-      { barcode: '10016', tributeCode: '0510122', period: 'Enero: 20/Feb/25', dueDate: '2025-02-20', periodicity: 'mensual', description: 'Aporte a cuenta Imp. Ingresos Personales', amount: 0, conditional: true },
-      { barcode: '30816', tributeCode: '0510122', period: 'Febrero: 20/Mar/25', dueDate: '2025-03-20', periodicity: 'mensual', description: 'Aporte a cuenta Imp. Ingresos Personales', amount: 0, conditional: true },
-      { barcode: '31616', tributeCode: '0510122', period: 'Marzo: 21/Abr/25', dueDate: '2025-04-21', periodicity: 'mensual', description: 'Aporte a cuenta Imp. Ingresos Personales', amount: 0, conditional: true },
-      { barcode: '32416', tributeCode: '0510122', period: 'Abril: 20/May/25', dueDate: '2025-05-20', periodicity: 'mensual', description: 'Aporte a cuenta Imp. Ingresos Personales', amount: 0, conditional: true },
-      { barcode: '33216', tributeCode: '0510122', period: 'Mayo: 20/Jun/25', dueDate: '2025-06-20', periodicity: 'mensual', description: 'Aporte a cuenta Imp. Ingresos Personales', amount: 0, conditional: true },
-      { barcode: '34016', tributeCode: '0510122', period: 'Junio: 21/Jul/25', dueDate: '2025-07-21', periodicity: 'mensual', description: 'Aporte a cuenta Imp. Ingresos Personales', amount: 0, conditional: true },
-      { barcode: '54816', tributeCode: '0510122', period: 'Julio: 20/Ago/25', dueDate: '2025-08-20', periodicity: 'mensual', description: 'Aporte a cuenta Imp. Ingresos Personales', amount: 0, conditional: true },
-      { barcode: '55616', tributeCode: '0510122', period: 'Agosto: 22/Sep/25', dueDate: '2025-09-22', periodicity: 'mensual', description: 'Aporte a cuenta Imp. Ingresos Personales', amount: 0, conditional: true },
-      { barcode: '56416', tributeCode: '0510122', period: 'Septiembre: 20/Oct/25', dueDate: '2025-10-20', periodicity: 'mensual', description: 'Aporte a cuenta Imp. Ingresos Personales', amount: 0, conditional: true },
-      { barcode: '57216', tributeCode: '0510122', period: 'Octubre: 20/Nov/25', dueDate: '2025-11-20', periodicity: 'mensual', description: 'Aporte a cuenta Imp. Ingresos Personales', amount: 0, conditional: true },
-      { barcode: '58016', tributeCode: '0510122', period: 'Noviembre: 22/Dic/25', dueDate: '2025-12-22', periodicity: 'mensual', description: 'Aporte a cuenta Imp. Ingresos Personales', amount: 0, conditional: true },
-      { barcode: '78816', tributeCode: '0510122', period: 'Diciembre: 20/Ene/26', dueDate: '2026-01-20', periodicity: 'mensual', description: 'Aporte a cuenta Imp. Ingresos Personales', amount: 0, conditional: true },
-      
-      // Pagos TRIMESTRALES - 1,200 CUP fijo
-      { barcode: '80205', tributeCode: '0820132', period: 'Trimestre enero - marzo: 21/Abr/25', dueDate: '2025-04-21', amount: 1200, periodicity: 'trimestral', description: 'Pago trimestral' },
-      { barcode: '02605', tributeCode: '0820132', period: 'Trimestre abril - junio: 21/Jul/25', dueDate: '2025-07-21', amount: 1200, periodicity: 'trimestral', description: 'Pago trimestral' },
-      { barcode: '05005', tributeCode: '0820132', period: 'Trimestre julio - septiembre: 20/Oct/25', dueDate: '2025-10-20', amount: 1200, periodicity: 'trimestral', description: 'Pago trimestral' },
-      { barcode: '27405', tributeCode: '0820132', period: 'Trimestre octubre - diciembre: 20/Ene/26', dueDate: '2026-01-20', amount: 1200, periodicity: 'trimestral', description: 'Pago trimestral' }
-    ];
-    
-    // Insertar o actualizar cada obligación para el usuario actual
-    const results = [];
-    for (const data of vectorFiscalData) {
-      const existing = await Obligation.findOne({ 
-        barcode: data.barcode,
-        user: req.user._id 
-      });
-      if (!existing) {
-        const obligation = new Obligation({
-          ...data,
-          user: req.user._id,
-          fiscalYear: 2025,
-          status: 'pendiente'
-        });
-        await obligation.save();
-        results.push({ barcode: data.barcode, action: 'created' });
-      } else {
-        results.push({ barcode: data.barcode, action: 'exists' });
-      }
-    }
-    
-    res.json({ 
-      message: 'Vector Fiscal 2025 importado',
-      total: vectorFiscalData.length,
-      results 
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
 // Importar obligaciones desde un PDF del Vector Fiscal RC-04A (cualquier año)
 exports.importFromPDF = async (req, res) => {
   try {
@@ -233,6 +160,16 @@ exports.importFromPDF = async (req, res) => {
       });
     }
 
+    // Guardar el PDF en el usuario para poder reutilizarlo
+    await User.findByIdAndUpdate(req.user._id, {
+      vectorFiscal: {
+        filename: req.file.originalname,
+        data: req.file.buffer,
+        uploadedAt: new Date(),
+        fiscalYear
+      }
+    });
+
     const results = [];
     for (const data of obligations) {
       const existing = await Obligation.findOne({
@@ -249,19 +186,97 @@ exports.importFromPDF = async (req, res) => {
         await obligation.save();
         results.push({ barcode: data.barcode, action: 'created' });
       } else {
-        results.push({ barcode: data.barcode, action: 'exists' });
+        // Actualizar datos de la obligación existente (fechas, montos, etc.)
+        // pero preservar el status si ya fue pagado
+        const updateData = {
+          tributeCode: data.tributeCode,
+          description: data.description,
+          period: data.period,
+          dueDate: data.dueDate,
+          periodicity: data.periodicity,
+          fiscalYear,
+          conditional: data.conditional
+        };
+        if (existing.status !== 'pagado') {
+          updateData.amount = data.amount;
+        }
+        await Obligation.findByIdAndUpdate(existing._id, updateData);
+        results.push({ barcode: data.barcode, action: 'updated' });
       }
     }
 
     const created = results.filter(r => r.action === 'created').length;
-    const existed = results.filter(r => r.action === 'exists').length;
+    const updated = results.filter(r => r.action === 'updated').length;
 
     res.json({
       message: `Vector Fiscal ${fiscalYear} importado desde PDF`,
       fiscalYear,
       total: totalFound,
       created,
-      existed,
+      updated,
+      results
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Re-procesar el PDF guardado del usuario (actualizar obligaciones sin subir de nuevo)
+exports.reprocessPDF = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user?.vectorFiscal?.data) {
+      return res.status(404).json({ error: 'No tiene un Vector Fiscal guardado. Suba un PDF primero.' });
+    }
+
+    const { obligations, fiscalYear, totalFound } = await parseVectorFiscalPDF(user.vectorFiscal.data);
+
+    if (totalFound === 0) {
+      return res.status(400).json({ error: 'No se pudieron extraer obligaciones del PDF guardado.' });
+    }
+
+    const results = [];
+    for (const data of obligations) {
+      const existing = await Obligation.findOne({
+        barcode: data.barcode,
+        user: req.user._id
+      });
+      if (!existing) {
+        const obligation = new Obligation({
+          ...data,
+          user: req.user._id,
+          fiscalYear,
+          status: 'pendiente'
+        });
+        await obligation.save();
+        results.push({ barcode: data.barcode, action: 'created' });
+      } else {
+        const updateData = {
+          tributeCode: data.tributeCode,
+          description: data.description,
+          period: data.period,
+          dueDate: data.dueDate,
+          periodicity: data.periodicity,
+          fiscalYear,
+          conditional: data.conditional
+        };
+        if (existing.status !== 'pagado') {
+          updateData.amount = data.amount;
+        }
+        await Obligation.findByIdAndUpdate(existing._id, updateData);
+        results.push({ barcode: data.barcode, action: 'updated' });
+      }
+    }
+
+    const created = results.filter(r => r.action === 'created').length;
+    const updated = results.filter(r => r.action === 'updated').length;
+
+    res.json({
+      message: `Vector Fiscal ${fiscalYear} re-procesado`,
+      fiscalYear,
+      total: totalFound,
+      created,
+      updated,
       results
     });
   } catch (error) {

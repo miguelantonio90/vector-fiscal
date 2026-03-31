@@ -225,7 +225,7 @@ exports.delete = async (req, res) => {
 // Resumen de pagos del usuario actual
 exports.getSummary = async (req, res) => {
   try {
-    const year = parseInt(req.query.year) || 2025;
+    const year = parseInt(req.query.year) || new Date().getFullYear();
     const startOfYear = new Date(year, 0, 1);
     const endOfYear = new Date(year, 11, 31);
     const userId = req.user._id;

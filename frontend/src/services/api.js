@@ -66,14 +66,14 @@ export const obligationsApi = {
   getUpcoming: () => api.get('/obligations/upcoming'),
   getOverdue: () => api.get('/obligations/overdue'),
   getSummary: (year = new Date().getFullYear()) => api.get('/obligations/summary', { params: { year } }),
-  importVectorFiscal: () => api.post('/obligations/import'),
   importFromPDF: (file) => {
     const formData = new FormData()
     formData.append('vectorFiscal', file)
     return api.post('/obligations/import-pdf', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
-  }
+  },
+  reprocessPDF: () => api.post('/obligations/reprocess')
 }
 
 // Payments API

@@ -85,13 +85,21 @@ router.post('/login', async (req, res) => {
 // GET /api/auth/me - Obtener usuario actual
 router.get('/me', auth, async (req, res) => {
   try {
-    res.json({
+    const data = {
       id: req.user._id,
       nit: req.user.nit,
       name: req.user.name,
       role: req.user.role,
       createdAt: req.user.createdAt
-    });
+    };
+    if (req.user.vectorFiscal?.filename) {
+      data.vectorFiscal = {
+        filename: req.user.vectorFiscal.filename,
+        uploadedAt: req.user.vectorFiscal.uploadedAt,
+        fiscalYear: req.user.vectorFiscal.fiscalYear
+      };
+    }
+    res.json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

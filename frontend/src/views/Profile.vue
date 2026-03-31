@@ -272,27 +272,35 @@
           </div>
         </div>
 
-        <!-- Fallback: plantilla 2025 -->
-        <button 
-          @click="importVectorFiscalTemplate"
-          :disabled="importing"
-          class="w-full flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-slate-700/50 hover:border-slate-500/50 hover:bg-slate-700/20 transition-all group"
-        >
-          <div class="flex items-center gap-4">
-            <div class="w-10 h-10 rounded-lg bg-slate-700/50 flex items-center justify-center">
-              <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        <!-- PDF guardado -->
+        <div v-if="user?.vectorFiscal" class="p-4 bg-slate-900/50 rounded-xl border border-slate-700/50">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-white">{{ user.vectorFiscal.filename }}</p>
+                <p class="text-xs text-slate-400">
+                  Subido {{ formatDate(user.vectorFiscal.uploadedAt) }} &middot; Año fiscal {{ user.vectorFiscal.fiscalYear }}
+                </p>
+              </div>
+            </div>
+            <button 
+              @click="reprocessSavedPDF"
+              :disabled="importing"
+              class="px-3 py-1.5 text-xs font-medium bg-slate-700/50 text-slate-300 rounded-lg hover:bg-slate-600/50 hover:text-white transition-all"
+            >
+              <svg v-if="importing" class="w-3 h-3 animate-spin inline mr-1" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-            </div>
-            <div class="text-left">
-              <p class="text-sm font-medium text-slate-300">Usar plantilla 2025</p>
-              <p class="text-xs text-slate-500">Cargar obligaciones predeterminadas sin PDF</p>
-            </div>
+              Actualizar obligaciones
+            </button>
           </div>
-          <svg class="w-4 h-4 text-slate-500 group-hover:text-slate-300 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
+        </div>
       </div>
     </div>
 
@@ -306,11 +314,14 @@
         </div>
         <h3 class="text-xl font-bold text-white mb-2">¡Importación Exitosa!</h3>
         <p class="text-slate-400 mb-4">
-          Se han importado <span class="text-emerald-400 font-semibold">{{ importResult.created }}</span> obligaciones
+          <span v-if="importResult.created > 0">
+            Se crearon <span class="text-emerald-400 font-semibold">{{ importResult.created }}</span> obligaciones nuevas
+          </span>
+          <span v-if="importResult.created > 0 && importResult.updated > 0"> y se </span>
+          <span v-if="importResult.updated > 0">
+            <span v-if="importResult.created === 0">Se </span>actualizaron <span class="text-blue-400 font-semibold">{{ importResult.updated }}</span> existentes
+          </span>
           para el año fiscal <span class="text-emerald-400 font-semibold">{{ importResult.fiscalYear }}</span>.
-        </p>
-        <p v-if="importResult.existed > 0" class="text-slate-500 text-sm mb-6">
-          {{ importResult.existed }} obligaciones ya existían y no se duplicaron.
         </p>
         <button 
           @click="showImportSuccess = false"
@@ -353,7 +364,7 @@ const savingProfile = ref(false)
 const savingPassword = ref(false)
 const importing = ref(false)
 const showImportSuccess = ref(false)
-const importResult = ref({ created: 0, fiscalYear: '', existed: 0 })
+const importResult = ref({ created: 0, fiscalYear: '', updated: 0 })
 const successMessage = ref('')
 const errorMessage = ref('')
 const showCurrentPassword = ref(false)
@@ -496,10 +507,11 @@ const uploadPDF = async (file) => {
     const response = await obligationsApi.importFromPDF(file)
     importResult.value = {
       created: response.data.created || 0,
-      existed: response.data.existed || 0,
+      updated: response.data.updated || 0,
       fiscalYear: response.data.fiscalYear || ''
     }
     showImportSuccess.value = true
+    await loadProfile()
     await loadStats()
   } catch (error) {
     console.error('Error importing PDF:', error)
@@ -510,22 +522,30 @@ const uploadPDF = async (file) => {
   }
 }
 
-const importVectorFiscalTemplate = async () => {
+const reprocessSavedPDF = async () => {
   clearMessages()
   importing.value = true
   try {
-    const response = await obligationsApi.importVectorFiscal()
-    const created = response.data.results?.filter(r => r.action === 'created').length || 0
-    const existed = response.data.results?.filter(r => r.action === 'exists').length || 0
-    importResult.value = { created, existed, fiscalYear: 2025 }
+    const response = await obligationsApi.reprocessPDF()
+    importResult.value = {
+      created: response.data.created || 0,
+      updated: response.data.updated || 0,
+      fiscalYear: response.data.fiscalYear || ''
+    }
     showImportSuccess.value = true
     await loadStats()
   } catch (error) {
-    console.error('Error importing:', error)
-    errorMessage.value = 'Error al importar obligaciones'
+    console.error('Error reprocessing:', error)
+    errorMessage.value = error.response?.data?.error || 'Error al re-procesar el PDF'
   } finally {
     importing.value = false
   }
+}
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  return d.toLocaleDateString('es-CU', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 onMounted(() => {

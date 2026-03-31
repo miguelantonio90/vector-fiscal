@@ -26,6 +26,13 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['user', 'admin'],
     default: 'user'
+  },
+  // Último Vector Fiscal subido
+  vectorFiscal: {
+    filename: String,
+    data: Buffer,
+    uploadedAt: Date,
+    fiscalYear: Number
   }
 }, {
   timestamps: true
@@ -53,6 +60,9 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
 userSchema.methods.toJSON = function() {
   const user = this.toObject();
   delete user.password;
+  if (user.vectorFiscal) {
+    delete user.vectorFiscal.data;
+  }
   return user;
 };
 

@@ -349,7 +349,7 @@ function generateTaxInsights(estimates, totalSavings) {
  * @param {number} year - Año a analizar
  * @returns {Object} - Análisis de flujo de caja
  */
-function analyzeCashFlow(incomeHistory, obligations, payments, year = 2025) {
+function analyzeCashFlow(incomeHistory, obligations, payments, year = new Date().getFullYear()) {
   const months = [];
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
