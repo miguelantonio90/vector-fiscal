@@ -108,9 +108,26 @@
 
       <!-- Payments Detail Table -->
       <div class="card print:shadow-none print:border print:border-gray-300 print:rounded-none print:bg-white">
-        <h3 class="text-lg font-display font-bold text-white print:text-black mb-4 print:border-b print:border-gray-300 print:pb-2">
-          DETALLE DE PAGOS REALIZADOS
-        </h3>
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+          <h3 class="text-lg font-display font-bold text-white print:text-black print:border-b print:border-gray-300 print:pb-2">
+            DETALLE DE PAGOS REALIZADOS
+          </h3>
+          <div class="flex flex-wrap items-center gap-3 print:hidden">
+            <select v-model="filterTribute" class="input w-44 text-sm py-2">
+              <option value="">Todas las obligaciones</option>
+              <option value="0114022">Ventas y servicios</option>
+              <option value="0510122">Ingresos personales</option>
+              <option value="0820132">Pago trimestral</option>
+              <option value="0530222">Contrib. territorial</option>
+            </select>
+            <select v-model="filterMethod" class="input w-40 text-sm py-2">
+              <option value="">Todo método</option>
+              <option value="efectivo">Efectivo</option>
+              <option value="transfermovil">Transfermóvil</option>
+              <option value="banco">Banco</option>
+            </select>
+          </div>
+        </div>
         
         <div v-if="loading" class="flex items-center justify-center py-12 print:hidden">
           <div class="w-8 h-8 border-2 border-onat-red border-t-transparent rounded-full animate-spin"></div>
@@ -131,7 +148,7 @@
             </thead>
             <tbody>
               <tr 
-                v-for="payment in allPayments" 
+                v-for="payment in filteredPayments" 
                 :key="payment._id"
                 class="border-b border-slate-700/30 print:border-gray-200"
               >
@@ -151,20 +168,25 @@
                 </td>
                 <td class="py-2 px-2 text-slate-500 print:text-gray-500 text-xs">{{ payment.reference || '-' }}</td>
               </tr>
-              <tr v-if="allPayments.length === 0">
+              <tr v-if="filteredPayments.length === 0">
                 <td colspan="7" class="py-8 text-center text-slate-400 print:text-gray-500">
                   No hay pagos registrados
                 </td>
               </tr>
             </tbody>
-            <tfoot v-if="allPayments.length > 0">
+            <tfoot v-if="filteredPayments.length > 0">
               <tr class="bg-slate-800/50 print:bg-gray-100 font-bold">
-                <td colspan="4" class="py-3 px-2 text-white print:text-black">TOTAL</td>
+                <td colspan="4" class="py-3 px-2 text-white print:text-black">
+                  TOTAL
+                  <span v-if="filteredPayments.length !== allPayments.length" class="text-xs font-normal text-slate-400 print:text-gray-500 ml-2">
+                    ({{ filteredPayments.length }} de {{ allPayments.length }})
+                  </span>
+                </td>
                 <td class="py-3 px-2 text-right text-emerald-400 print:text-green-700">
-                  {{ formatCurrencyPrint(paymentsSummary.totalBonus) }}
+                  {{ formatCurrencyPrint(filteredTotalBonus) }}
                 </td>
                 <td class="py-3 px-2 text-right font-mono text-white print:text-black text-lg">
-                  {{ formatCurrencyPrint(paymentsSummary.totalPaid) }}
+                  {{ formatCurrencyPrint(filteredTotalPaid) }}
                 </td>
                 <td class="py-3 px-2"></td>
               </tr>
@@ -597,6 +619,8 @@ import { obligationsApi, paymentsApi, incomesApi, predictionsApi } from '../serv
 const selectedYear = ref(new Date().getFullYear())
 const yearOptions = [new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1]
 const loading = ref(true)
+const filterTribute = ref('')
+const filterMethod = ref('')
 const obligationsSummary = ref({ pending: 0, paid: 0, overdue: 0, total: 0, totalAmount: 0, paidAmount: 0, avgMonthlyPayment: 0 })
 const paymentsSummary = ref({ totalPaid: 0, totalBonus: 0, totalPayments: 0, byMonth: [], byMethod: [] })
 const incomeSummary = ref({ months: [], totals: null })
@@ -650,6 +674,25 @@ const maxMonthlyPayment = computed(() => {
 
 const paymentsByMethod = computed(() => {
   return paymentsSummary.value.byMethod || []
+})
+
+const filteredPayments = computed(() => {
+  let result = allPayments.value
+  if (filterTribute.value) {
+    result = result.filter(p => p.obligation?.tributeCode === filterTribute.value)
+  }
+  if (filterMethod.value) {
+    result = result.filter(p => p.paymentMethod === filterMethod.value)
+  }
+  return result
+})
+
+const filteredTotalPaid = computed(() => {
+  return filteredPayments.value.reduce((sum, p) => sum + (p.amount || 0), 0)
+})
+
+const filteredTotalBonus = computed(() => {
+  return filteredPayments.value.reduce((sum, p) => sum + (p.bonusAmount || 0), 0)
 })
 
 function formatCurrency(amount) {
