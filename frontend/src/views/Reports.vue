@@ -108,19 +108,19 @@
 
       <!-- Payments Detail Table -->
       <div class="card print:shadow-none print:border print:border-gray-300 print:rounded-none print:bg-white">
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-          <h3 class="text-lg font-display font-bold text-white print:text-black print:border-b print:border-gray-300 print:pb-2">
+        <div class="flex items-center justify-between gap-4 mb-4">
+          <h3 class="text-lg font-display font-bold text-white print:text-black print:border-b print:border-gray-300 print:pb-2 flex-shrink-0">
             DETALLE DE PAGOS REALIZADOS
           </h3>
-          <div class="flex flex-wrap items-center gap-3 print:hidden">
-            <select v-model="filterTribute" class="input w-44 text-sm py-2">
+          <div class="flex items-center gap-3 print:hidden">
+            <select v-model="filterTribute" class="input w-44 text-sm py-1.5">
               <option value="">Todas las obligaciones</option>
               <option value="0114022">Ventas y servicios</option>
               <option value="0510122">Ingresos personales</option>
               <option value="0820132">Pago trimestral</option>
               <option value="0530222">Contrib. territorial</option>
             </select>
-            <select v-model="filterMethod" class="input w-40 text-sm py-2">
+            <select v-model="filterMethod" class="input w-40 text-sm py-1.5">
               <option value="">Todo método</option>
               <option value="efectivo">Efectivo</option>
               <option value="transfermovil">Transfermóvil</option>
@@ -822,8 +822,8 @@ async function loadData() {
       obligationsApi.getSummary(selectedYear.value),
       paymentsApi.getSummary(selectedYear.value),
       incomesApi.getAnnualSummary(selectedYear.value),
-      paymentsApi.getAll(),
-      obligationsApi.getAll(),
+      paymentsApi.getAll({ year: selectedYear.value }),
+      obligationsApi.getAll({ year: selectedYear.value }),
       predictionsApi.getAnnualDeclaration(selectedYear.value)
     ])
     

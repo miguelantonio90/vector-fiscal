@@ -3,7 +3,7 @@ const { Payment, Obligation } = require('../models');
 // Obtener todos los pagos del usuario actual
 exports.getAll = async (req, res) => {
   try {
-    const { startDate, endDate, paymentMethod } = req.query;
+    const { startDate, endDate, paymentMethod, year } = req.query;
     const filter = { user: req.user._id };
     
     if (startDate || endDate) {
@@ -13,9 +13,14 @@ exports.getAll = async (req, res) => {
     }
     if (paymentMethod) filter.paymentMethod = paymentMethod;
     
-    const payments = await Payment.find(filter)
+    let payments = await Payment.find(filter)
       .populate('obligation')
       .sort({ paymentDate: -1 });
+    
+    if (year) {
+      const y = parseInt(year);
+      payments = payments.filter(p => p.obligation?.fiscalYear === y);
+    }
     
     res.json(payments);
   } catch (error) {

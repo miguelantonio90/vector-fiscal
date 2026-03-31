@@ -83,9 +83,9 @@
 
     <!-- Payments List -->
     <div class="card">
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-        <h3 class="text-lg font-display font-bold text-white">Historial de Pagos</h3>
-        <div class="flex flex-wrap items-center gap-3">
+      <div class="flex items-center justify-between gap-4 mb-6">
+        <h3 class="text-lg font-display font-bold text-white flex-shrink-0">Historial de Pagos</h3>
+        <div class="flex items-center gap-2">
           <select v-model="filterYear" class="input w-28 text-sm py-2">
             <option v-for="y in yearOptions" :key="y" :value="y">{{ y || 'Todo año' }}</option>
           </select>
