@@ -1,4 +1,4 @@
-# MiONAT - Sistema de Gestión Tributaria 2025
+# MiONAT - Sistema de Gestión Tributaria
 
 Sistema web multi-usuario para gestionar pagos tributarios a la ONAT (Oficina Nacional de Administración Tributaria) de Cuba para el año fiscal 2025.
 
