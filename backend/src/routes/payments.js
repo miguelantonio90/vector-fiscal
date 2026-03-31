@@ -8,6 +8,9 @@ router.get('/', controller.getAll);
 // GET /api/payments/summary - Resumen de pagos
 router.get('/summary', controller.getSummary);
 
+// GET /api/payments/preview-surcharge - Previsualizar recargo por mora
+router.get('/preview-surcharge', controller.previewSurcharge);
+
 // GET /api/payments/:id - Obtener un pago
 router.get('/:id', controller.getById);
 

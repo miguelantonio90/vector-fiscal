@@ -89,12 +89,12 @@
             </p>
             <div class="space-y-1 text-xs">
               <div class="flex justify-between text-slate-400">
-                <span>Imp. Ventas (10%)</span>
+                <span>0114022 (10%)</span>
                 <span class="text-amber-400">{{ formatCurrency(mes.ingreso.amount * 0.10) }}</span>
               </div>
               <div v-if="mes.ingreso.amount > 3260" class="flex justify-between text-slate-400">
-                <span>Aporte (3%)</span>
-                <span class="text-orange-400">{{ formatCurrency((mes.ingreso.amount - 3260) * 0.03) }}</span>
+                <span>0510122 (5%)</span>
+                <span class="text-orange-400">{{ formatCurrency((mes.ingreso.amount - 3260) * 0.05) }}</span>
               </div>
             </div>
           </div>
@@ -197,13 +197,14 @@
           <div>
             <label class="block text-sm font-medium text-slate-300 mb-2">Ingreso Bruto (CUP)</label>
             <div class="relative">
-              <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10">$</span>
               <input
                 v-model.number="formIngreso"
                 type="number"
                 min="0"
                 step="0.01"
-                class="input pl-8"
+                class="input"
+                style="padding-left: 28px"
                 placeholder="Ej: 2800.00"
               />
             </div>
@@ -220,25 +221,111 @@
           </div>
 
           <!-- Preview -->
-          <div v-if="formIngreso > 0" class="p-4 bg-slate-900/50 rounded-lg space-y-2">
-            <p class="text-sm font-medium text-slate-300 mb-2">Vista previa de impuestos:</p>
-            <div class="flex justify-between text-sm">
-              <span class="text-slate-400">Imp. Ventas (10%)</span>
-              <span class="text-amber-400 font-mono">{{ formatCurrency(formIngreso * 0.10) }}</span>
+          <div v-if="formIngreso > 0" class="p-4 bg-slate-900/50 rounded-lg space-y-0">
+            <p class="text-sm font-medium text-slate-300 mb-3">Obligaciones que se generan este mes:</p>
+
+            <!-- Alerta de mora -->
+            <div v-if="surchargeVentas || surchargeAporte" class="mb-3 p-3 bg-red-900/30 border border-red-700/60 rounded-lg">
+              <div class="flex items-center gap-2 mb-2">
+                <svg class="w-5 h-5 text-red-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <p class="text-sm font-bold text-red-300">Recargo por mora (1060122)</p>
+              </div>
+              <p class="text-xs text-red-300/80 mb-2">La fecha límite de pago ya venció. Se aplica recargo según reglas ONAT.</p>
+              <div v-if="surchargeVentas" class="flex justify-between text-xs py-1">
+                <span class="text-red-300/70">Mora 0114022: {{ surchargeVentas.desc }}</span>
+                <span class="text-red-400 font-mono font-bold">+{{ formatCurrency(surchargeVentas.amount) }}</span>
+              </div>
+              <div v-if="surchargeAporte" class="flex justify-between text-xs py-1">
+                <span class="text-red-300/70">Mora 0510122: {{ surchargeAporte.desc }}</span>
+                <span class="text-red-400 font-mono font-bold">+{{ formatCurrency(surchargeAporte.amount) }}</span>
+              </div>
+              <div class="flex justify-between text-xs pt-2 mt-1 border-t border-red-700/40">
+                <span class="text-red-200 font-medium">Total recargo por mora</span>
+                <span class="text-red-400 font-mono font-bold">{{ formatCurrency(totalSurcharge) }}</span>
+              </div>
             </div>
-            <div v-if="formIngreso > 3260" class="flex justify-between text-sm">
-              <span class="text-slate-400">Aporte Ingresos (3% de {{ formatCurrency(formIngreso - 3260) }})</span>
-              <span class="text-orange-400 font-mono">{{ formatCurrency((formIngreso - 3260) * 0.03) }}</span>
+
+            <div class="divide-y divide-slate-700/50">
+              <!-- 0114022 -->
+              <div class="py-2">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm text-slate-300">0114022 - Imp. Ventas y servicios (10%)</p>
+                    <p class="text-xs" :class="surchargeVentas ? 'text-red-400' : 'text-slate-500'">
+                      <template v-if="surchargeVentas">Vencido el {{ monthlyDueDate }} — {{ surchargeVentas.lateDays }} días hábiles de mora</template>
+                      <template v-else>Pagar antes del <span class="text-amber-400 font-medium">{{ monthlyDueDate }}</span></template>
+                    </p>
+                  </div>
+                  <span class="text-amber-400 font-mono font-medium">{{ formatCurrency(formIngreso * 0.10) }}</span>
+                </div>
+                <div v-if="surchargeVentas" class="flex justify-between mt-1 ml-4">
+                  <span class="text-xs text-red-400/70">+ Recargo {{ (surchargeVentas.rate * 100).toFixed(1) }}%</span>
+                  <span class="text-xs text-red-400 font-mono">+{{ formatCurrency(surchargeVentas.amount) }}</span>
+                </div>
+              </div>
+
+              <!-- 0510122 -->
+              <div class="py-2">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm" :class="formIngreso > 3260 ? 'text-slate-300' : 'text-slate-500'">
+                      0510122 - Aporte Ingresos Personales (5%)
+                    </p>
+                    <p v-if="formIngreso > 3260" class="text-xs" :class="surchargeAporte ? 'text-red-400' : 'text-slate-500'">
+                      <template v-if="surchargeAporte">5% de {{ formatCurrency(formIngreso - 3260) }}. Vencido el {{ monthlyDueDate }} — {{ surchargeAporte.lateDays }} días hábiles</template>
+                      <template v-else>5% de {{ formatCurrency(formIngreso - 3260) }} (excedente). Pagar antes del <span class="text-orange-400 font-medium">{{ monthlyDueDate }}</span></template>
+                    </p>
+                    <p v-else class="text-xs text-emerald-500">No aplica (ingreso &le; $3,260 mínimo exento)</p>
+                  </div>
+                  <span v-if="formIngreso > 3260" class="text-orange-400 font-mono font-medium">{{ formatCurrency((formIngreso - 3260) * 0.05) }}</span>
+                  <span v-else class="text-slate-600 font-mono">$0.00</span>
+                </div>
+                <div v-if="surchargeAporte" class="flex justify-between mt-1 ml-4">
+                  <span class="text-xs text-red-400/70">+ Recargo {{ (surchargeAporte.rate * 100).toFixed(1) }}%</span>
+                  <span class="text-xs text-red-400 font-mono">+{{ formatCurrency(surchargeAporte.amount) }}</span>
+                </div>
+              </div>
+
+              <!-- 0820132 -->
+              <div class="flex items-center justify-between py-2">
+                <div>
+                  <p class="text-sm text-slate-400">0820132 - Contrib. Seguridad Social (20% base)</p>
+                  <p class="text-xs text-slate-500">Trimestral. Pagar antes del <span class="text-blue-400 font-medium">{{ quarterlyDueDate }}</span></p>
+                </div>
+                <span class="text-blue-400 font-mono text-xs italic">trimestral</span>
+              </div>
+
+              <!-- 0530222 -->
+              <div class="flex items-center justify-between py-2">
+                <div>
+                  <p class="text-sm text-slate-400">0530222 - Liquidación adicional (DJ-08)</p>
+                  <p class="text-xs text-slate-500">Anual. Pagar antes del <span class="text-purple-400 font-medium">30/Abr/{{ (currentFiscalYear + 1).toString().slice(-2) }}</span></p>
+                </div>
+                <span class="text-purple-400 font-mono text-xs italic">anual</span>
+              </div>
             </div>
-            <div v-else class="text-sm text-emerald-400">
-              ✓ No aplica aporte (ingreso ≤ $3,260)
-            </div>
-            <div class="flex justify-between text-sm pt-2 border-t border-slate-700">
-              <span class="text-white font-medium">Total impuestos</span>
+
+            <div class="flex justify-between text-sm pt-3 mt-1 border-t border-slate-600">
+              <span class="text-white font-bold">Total cargos mensuales</span>
               <span class="text-onat-red font-mono font-bold">
-                {{ formatCurrency(formIngreso * 0.10 + (formIngreso > 3260 ? (formIngreso - 3260) * 0.03 : 0)) }}
+                {{ formatCurrency(formIngreso * 0.10 + (formIngreso > 3260 ? (formIngreso - 3260) * 0.05 : 0)) }}
               </span>
             </div>
+            <div v-if="totalSurcharge > 0" class="flex justify-between text-sm pt-1">
+              <span class="text-red-300 font-bold">+ Recargo por mora (1060122)</span>
+              <span class="text-red-400 font-mono font-bold">{{ formatCurrency(totalSurcharge) }}</span>
+            </div>
+            <div v-if="totalSurcharge > 0" class="flex justify-between text-sm pt-2 mt-1 border-t border-red-700/40">
+              <span class="text-white font-bold text-base">TOTAL A PAGAR</span>
+              <span class="text-red-400 font-mono font-bold text-base">
+                {{ formatCurrency(formIngreso * 0.10 + (formIngreso > 3260 ? (formIngreso - 3260) * 0.05 : 0) + totalSurcharge) }}
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">
+              Descuento 3% por Transfermóvil. Bonificación 5% en DJ si declara antes del 28/Feb.
+            </p>
           </div>
 
           <div class="flex gap-3 pt-4">
@@ -322,6 +409,101 @@ const mesMinimo = computed(() => {
   if (ingresos.value.length === 0) return { amount: 0, nombre: '-' }
   const min = ingresos.value.reduce((prev, curr) => prev.amount < curr.amount ? prev : curr)
   return { amount: min.amount, nombre: nombresMeses[min.month] }
+})
+
+const nombresMesesCortos = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+
+function getAdjustedDueDay(year, monthIndex) {
+  const d = new Date(year, monthIndex, 20)
+  const dow = d.getDay()
+  return dow === 0 ? 22 : dow === 6 ? 21 : 20
+}
+
+function getMonthlyDueDateObj(mesNumero) {
+  const nextMonth = mesNumero === 12 ? 1 : mesNumero + 1
+  const nextYear = mesNumero === 12 ? currentFiscalYear + 1 : currentFiscalYear
+  const day = getAdjustedDueDay(nextYear, nextMonth - 1)
+  return new Date(nextYear, nextMonth - 1, day)
+}
+
+function getQuarterlyDueDateObj(mesNumero) {
+  const qEnd = mesNumero <= 3 ? 3 : mesNumero <= 6 ? 6 : mesNumero <= 9 ? 9 : 12
+  const dueMonth = qEnd === 12 ? 1 : qEnd + 1
+  const dueYear = qEnd === 12 ? currentFiscalYear + 1 : currentFiscalYear
+  const day = getAdjustedDueDay(dueYear, dueMonth - 1)
+  return new Date(dueYear, dueMonth - 1, day)
+}
+
+function formatDueDate(dateObj) {
+  const day = dateObj.getDate()
+  const m = dateObj.getMonth() + 1
+  const y = dateObj.getFullYear()
+  return `${day}/${nombresMesesCortos[m]}/${y.toString().slice(-2)}`
+}
+
+function countBusinessDays(from, to) {
+  let count = 0
+  const cursor = new Date(from)
+  cursor.setDate(cursor.getDate() + 1)
+  while (cursor <= to) {
+    const dow = cursor.getDay()
+    if (dow !== 0 && dow !== 6) count++
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return count
+}
+
+function calcSurcharge(principal, dueDate) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const due = new Date(dueDate)
+  due.setHours(0, 0, 0, 0)
+  if (today <= due) return null
+  const lateDays = countBusinessDays(due, today)
+  if (lateDays <= 0) return null
+  let rate, amount, desc
+  if (lateDays <= 30) {
+    rate = 0.02
+    amount = principal * rate
+    desc = `${lateDays} días hábiles de mora - 2% del principal`
+  } else if (lateDays <= 60) {
+    rate = 0.05
+    amount = principal * rate
+    desc = `${lateDays} días hábiles de mora - 5% del principal`
+  } else {
+    rate = 0.001 * lateDays
+    const maxRate = 0.40
+    rate = Math.min(rate, maxRate)
+    amount = principal * rate
+    desc = `${lateDays} días hábiles de mora - 0.1%/día (${(rate * 100).toFixed(1)}%, tope 40%)`
+  }
+  return { lateDays, rate, amount: Math.round(amount * 100) / 100, desc }
+}
+
+const monthlyDueDate = computed(() => {
+  if (!editingMes.value) return ''
+  return formatDueDate(getMonthlyDueDateObj(editingMes.value.numero))
+})
+
+const quarterlyDueDate = computed(() => {
+  if (!editingMes.value) return ''
+  return formatDueDate(getQuarterlyDueDateObj(editingMes.value.numero))
+})
+
+const surchargeVentas = computed(() => {
+  if (!editingMes.value || !formIngreso.value || formIngreso.value <= 0) return null
+  const principal = formIngreso.value * 0.10
+  return calcSurcharge(principal, getMonthlyDueDateObj(editingMes.value.numero))
+})
+
+const surchargeAporte = computed(() => {
+  if (!editingMes.value || !formIngreso.value || formIngreso.value <= 3260) return null
+  const principal = (formIngreso.value - 3260) * 0.05
+  return calcSurcharge(principal, getMonthlyDueDateObj(editingMes.value.numero))
+})
+
+const totalSurcharge = computed(() => {
+  return (surchargeVentas.value?.amount || 0) + (surchargeAporte.value?.amount || 0)
 })
 
 function formatCurrency(amount) {

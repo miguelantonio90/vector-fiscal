@@ -15,13 +15,14 @@
               Ingreso Bruto Mensual (CUP)
             </label>
             <div class="relative">
-              <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10">$</span>
               <input
                 v-model.number="grossIncome"
                 type="number"
                 min="0"
                 step="0.01"
-                class="input pl-8"
+                class="input"
+                style="padding-left: 28px"
                 placeholder="Ej: 3500.00"
                 @input="calculate"
               />

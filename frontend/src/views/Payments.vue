@@ -182,6 +182,9 @@
               <p v-if="payment.bonusAmount > 0" class="text-xs text-emerald-400">
                 Ahorraste {{ formatCurrency(payment.bonusAmount) }}
               </p>
+              <p v-if="payment.lateSurcharge?.surchargeAmount > 0" class="text-xs text-red-400">
+                Mora: +{{ formatCurrency(payment.lateSurcharge.surchargeAmount) }} ({{ payment.lateSurcharge.surchargeRate }}%)
+              </p>
             </div>
             
             <!-- Actions -->
@@ -284,16 +287,17 @@
                 Obligación a pagar
               </span>
             </label>
-            <select v-model="paymentForm.obligationId" class="input" required :disabled="isEditing">
-              <option value="">Seleccionar obligación...</option>
+            <select v-model="paymentForm.obligationId" class="input text-sm" required :disabled="isEditing">
+              <option value="">Seleccionar obligación pendiente...</option>
               <option 
                 v-for="obligation in availableObligations" 
                 :key="obligation._id" 
                 :value="obligation._id"
               >
-                {{ obligation.description }} - {{ obligation.period }}
+                {{ formatObligationLabel(obligation) }}
               </option>
             </select>
+            <p v-if="availableObligations.length === 0 && !isEditing" class="text-xs text-emerald-400 mt-1">No hay obligaciones pendientes. ¡Estás al día!</p>
             <p v-if="isEditing" class="text-xs text-slate-500 mt-1">No se puede cambiar la obligación al editar</p>
           </div>
 
@@ -310,13 +314,14 @@
                 </span>
               </label>
               <div class="relative">
-                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">$</span>
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium pointer-events-none z-10">$</span>
                 <input
                   v-model.number="paymentForm.amount"
                   type="number"
                   min="0"
                   step="0.01"
-                  class="input pl-10 text-lg font-mono"
+                  class="input text-lg font-mono"
+                  style="padding-left: 28px"
                   placeholder="0.00"
                   required
                 />
@@ -491,8 +496,29 @@
             ></textarea>
           </div>
 
+          <!-- Late Surcharge Warning -->
+          <div v-if="surchargePreview" class="p-4 bg-red-900/20 rounded-xl border border-red-700/30">
+            <p class="text-sm text-red-400 font-bold mb-2 flex items-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+              Recargo por mora (Cód. 1060122)
+            </p>
+            <p class="text-xs text-slate-400 mb-2">{{ surchargePreview.description }}</p>
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-300">Importe principal</span>
+              <span class="text-white font-mono">{{ formatCurrency(paymentForm.amount) }}</span>
+            </div>
+            <div class="flex justify-between text-sm mt-1">
+              <span class="text-red-300">Recargo ({{ surchargePreview.surchargeRate }}%)</span>
+              <span class="text-red-400 font-mono font-bold">+ {{ formatCurrency(surchargePreview.surchargeAmount) }}</span>
+            </div>
+            <div class="flex justify-between text-sm mt-2 pt-2 border-t border-red-800/50">
+              <span class="text-white font-bold">Total a pagar</span>
+              <span class="text-red-400 font-mono font-bold">{{ formatCurrency(paymentForm.amount + surchargePreview.surchargeAmount) }}</span>
+            </div>
+          </div>
+
           <!-- Bonus Preview (when auto-calculating) -->
-          <div v-if="selectedObligation && paymentForm.amount && !paymentForm.bonusAlreadyApplied" class="p-4 bg-emerald-900/20 rounded-xl border border-emerald-700/30">
+          <div v-if="selectedObligation && paymentForm.amount && !surchargePreview && !paymentForm.bonusAlreadyApplied" class="p-4 bg-emerald-900/20 rounded-xl border border-emerald-700/30">
             <p class="text-sm text-emerald-400 font-medium mb-2">Bonificaciones que se aplicarán:</p>
             <div class="flex justify-between text-sm">
               <span class="text-slate-300">Pago anticipado (5%)</span>
@@ -547,7 +573,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { paymentsApi, obligationsApi } from '../services/api'
 
@@ -580,7 +606,7 @@ const paymentForm = ref({
   obligationId: '',
   amount: null,
   paymentDate: new Date().toISOString().split('T')[0],
-  paymentMethod: 'efectivo',
+  paymentMethod: 'transfermovil',
   reference: '',
   notes: '',
   bonusMode: 'already', // 'none', 'already', 'calculate'
@@ -628,8 +654,31 @@ const availableObligations = computed(() => {
   if (isEditing.value) {
     return allObligations.value
   }
+  const now = new Date()
   return pendingObligations.value
+    .sort((a, b) => {
+      const aOverdue = new Date(a.dueDate) < now ? 0 : 1
+      const bOverdue = new Date(b.dueDate) < now ? 0 : 1
+      if (aOverdue !== bOverdue) return aOverdue - bOverdue
+      return new Date(a.dueDate) - new Date(b.dueDate)
+    })
 })
+
+function formatObligationLabel(o) {
+  const code = o.tributeCode || ''
+  const period = o.period || ''
+  const amt = o.amount ? `$${o.amount.toLocaleString('es-CU')}` : 'según ingreso'
+  const due = o.dueDate ? new Date(o.dueDate) : null
+  const now = new Date()
+  now.setHours(0,0,0,0)
+  let overdueTag = ''
+  if (due) {
+    const d = new Date(due)
+    d.setHours(0,0,0,0)
+    if (d < now) overdueTag = ' ⚠ VENCIDA'
+  }
+  return `${code} ${period} | ${amt}${overdueTag}`
+}
 
 const selectedObligation = computed(() => {
   return allObligations.value.find(o => o._id === paymentForm.value.obligationId) ||
@@ -642,6 +691,34 @@ const isEarlyPayment = computed(() => {
   const dueDate = new Date(selectedObligation.value.dueDate)
   return payDate < dueDate
 })
+
+const isLatePayment = computed(() => {
+  if (!selectedObligation.value || !paymentForm.value.paymentDate) return false
+  const payDate = new Date(paymentForm.value.paymentDate)
+  const dueDate = new Date(selectedObligation.value.dueDate)
+  payDate.setHours(0, 0, 0, 0)
+  dueDate.setHours(0, 0, 0, 0)
+  return payDate > dueDate
+})
+
+const surchargePreview = ref(null)
+
+watch(
+  () => [paymentForm.value.obligationId, paymentForm.value.amount, paymentForm.value.paymentDate],
+  async ([oblId, amt, pDate]) => {
+    if (!oblId || !amt || !pDate || !isLatePayment.value) {
+      surchargePreview.value = null
+      return
+    }
+    try {
+      const res = await paymentsApi.previewSurcharge(oblId, amt, pDate)
+      surchargePreview.value = res.data.surcharge
+    } catch {
+      surchargePreview.value = null
+    }
+  },
+  { immediate: true }
+)
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('es-CU', {
@@ -694,7 +771,7 @@ function closeModal() {
     obligationId: '',
     amount: null,
     paymentDate: new Date().toISOString().split('T')[0],
-    paymentMethod: 'efectivo',
+    paymentMethod: 'transfermovil',
     reference: '',
     notes: '',
     bonusMode: 'already',
@@ -726,16 +803,17 @@ function editPayment(payment) {
 async function loadData() {
   loading.value = true
   try {
-    const [paymentsRes, summaryRes, pendingRes, allRes] = await Promise.all([
+    const [paymentsRes, summaryRes, pendingRes, overdueRes, allRes] = await Promise.all([
       paymentsApi.getAll(),
       paymentsApi.getSummary(),
-      obligationsApi.getAll({ status: 'pendiente' }),
-      obligationsApi.getAll()
+      obligationsApi.getAll({ status: 'pendiente', year: currentYear }),
+      obligationsApi.getAll({ status: 'vencido', year: currentYear }),
+      obligationsApi.getAll({ year: currentYear })
     ])
     
     payments.value = paymentsRes.data
     paymentSummary.value = summaryRes.data
-    pendingObligations.value = pendingRes.data
+    pendingObligations.value = [...pendingRes.data, ...overdueRes.data]
     allObligations.value = allRes.data
 
     // Check if obligationId was passed in URL

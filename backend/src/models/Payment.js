@@ -40,6 +40,13 @@ const paymentSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  // Recargo por mora
+  lateSurcharge: {
+    lateDays: { type: Number, default: 0 },
+    surchargeRate: { type: Number, default: 0 },
+    surchargeAmount: { type: Number, default: 0 },
+    description: { type: String, default: '' }
+  },
   // Número de referencia o comprobante
   reference: {
     type: String

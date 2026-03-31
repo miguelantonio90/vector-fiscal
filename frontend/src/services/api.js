@@ -84,7 +84,8 @@ export const paymentsApi = {
   create: (data) => api.post('/payments', data),
   update: (id, data) => api.put(`/payments/${id}`, data),
   delete: (id) => api.delete(`/payments/${id}`),
-  getSummary: (year = new Date().getFullYear()) => api.get('/payments/summary', { params: { year } })
+  getSummary: (year = new Date().getFullYear()) => api.get('/payments/summary', { params: { year } }),
+  previewSurcharge: (obligationId, amount, paymentDate) => api.get('/payments/preview-surcharge', { params: { obligationId, amount, paymentDate } })
 }
 
 // Incomes API

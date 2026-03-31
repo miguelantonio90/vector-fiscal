@@ -1,5 +1,62 @@
 const { Payment, Obligation } = require('../models');
 
+/**
+ * Calcula el recargo por mora según las reglas ONAT (código tributo 1060122):
+ *   - Hasta 30 días hábiles: 2% del principal
+ *   - Más de 30 y hasta 60 días hábiles: 5% del principal
+ *   - Más de 60 días hábiles: 0.1% por cada día, hasta el 40% del principal
+ *
+ * @param {number} principal - monto adeudado
+ * @param {Date} dueDate - fecha límite de pago
+ * @param {Date} paymentDate - fecha del pago
+ * @returns {{ lateDays: number, surchargeRate: number, surchargeAmount: number, description: string } | null}
+ */
+function calculateLateSurcharge(principal, dueDate, paymentDate) {
+  const due = new Date(dueDate);
+  const paid = new Date(paymentDate);
+  due.setHours(0, 0, 0, 0);
+  paid.setHours(0, 0, 0, 0);
+
+  if (paid <= due) return null;
+
+  const msPerDay = 86400000;
+  const calendarDays = Math.floor((paid - due) / msPerDay);
+
+  let businessDays = 0;
+  const d = new Date(due);
+  for (let i = 0; i < calendarDays; i++) {
+    d.setDate(d.getDate() + 1);
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) businessDays++;
+  }
+
+  if (businessDays <= 0) return null;
+
+  let surchargeRate;
+  let description;
+
+  if (businessDays <= 30) {
+    surchargeRate = 2;
+    description = `${businessDays} días hábiles de mora → 2% recargo`;
+  } else if (businessDays <= 60) {
+    surchargeRate = 5;
+    description = `${businessDays} días hábiles de mora → 5% recargo`;
+  } else {
+    surchargeRate = Math.min(businessDays * 0.1, 40);
+    description = `${businessDays} días hábiles de mora → ${surchargeRate.toFixed(1)}% recargo (0.1%/día, máx 40%)`;
+  }
+
+  const surchargeAmount = Math.round((principal * surchargeRate / 100) * 100) / 100;
+
+  return {
+    lateDays: businessDays,
+    calendarDays,
+    surchargeRate,
+    surchargeAmount,
+    description
+  };
+}
+
 // Obtener todos los pagos del usuario actual
 exports.getAll = async (req, res) => {
   try {
@@ -80,7 +137,9 @@ exports.create = async (req, res) => {
     }
     
     const pDate = new Date(paymentDate || Date.now());
-    
+
+    const surcharge = calculateLateSurcharge(amount, obligation.dueDate, pDate);
+
     const payment = new Payment({
       user: req.user._id,
       obligation: obligationId,
@@ -89,13 +148,13 @@ exports.create = async (req, res) => {
       paymentMethod,
       bonusApplied,
       bonusAmount,
+      lateSurcharge: surcharge || { lateDays: 0, surchargeRate: 0, surchargeAmount: 0, description: '' },
       reference,
       notes
     });
     
     await payment.save();
     
-    // Actualizar estado y monto real de la obligación
     obligation.status = 'pagado';
     obligation.amount = amount;
     await obligation.save();
@@ -107,7 +166,8 @@ exports.create = async (req, res) => {
         bonusApplied: `${bonusApplied}%`,
         bonusAmount,
         actualPaid: amount - bonusAmount
-      }
+      },
+      surcharge: surcharge || null
     });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -149,11 +209,15 @@ exports.update = async (req, res) => {
       bonusAmount = (amount * bonusApplied) / 100;
     }
     
+    const pDate = new Date(paymentDate);
+    const surcharge = obligation ? calculateLateSurcharge(amount, obligation.dueDate, pDate) : null;
+
     payment.amount = amount;
-    payment.paymentDate = new Date(paymentDate);
+    payment.paymentDate = pDate;
     payment.paymentMethod = paymentMethod;
     payment.bonusApplied = bonusApplied;
     payment.bonusAmount = bonusAmount;
+    payment.lateSurcharge = surcharge || { lateDays: 0, surchargeRate: 0, surchargeAmount: 0, description: '' };
     payment.reference = reference;
     payment.notes = notes;
     
@@ -190,6 +254,27 @@ exports.delete = async (req, res) => {
     
     await payment.deleteOne();
     res.json({ message: 'Pago eliminado y obligación restaurada a pendiente' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Previsualizar recargo por mora sin crear pago
+exports.previewSurcharge = async (req, res) => {
+  try {
+    const { obligationId, amount, paymentDate } = req.query;
+    if (!obligationId || !amount) {
+      return res.json({ surcharge: null });
+    }
+    const obligation = await Obligation.findOne({ _id: obligationId, user: req.user._id });
+    if (!obligation) return res.json({ surcharge: null });
+
+    const surcharge = calculateLateSurcharge(
+      parseFloat(amount),
+      obligation.dueDate,
+      new Date(paymentDate || Date.now())
+    );
+    res.json({ surcharge, dueDate: obligation.dueDate });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
