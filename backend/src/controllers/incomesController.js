@@ -1,5 +1,6 @@
 const { Income } = require('../models');
 const { calculateMonthlyTaxes, calculateIncomeAdvance } = require('../utils/taxCalculator');
+const { syncMonthObligationAmounts } = require('../utils/syncObligationAmounts');
 
 // Obtener todos los ingresos del usuario actual
 exports.getAll = async (req, res) => {
@@ -61,10 +62,14 @@ exports.upsert = async (req, res) => {
       },
       { new: true, upsert: true, runValidators: true }
     );
+
+    // Actualizar montos de obligaciones del mes (0114022 / 0510122)
+    const sync = await syncMonthObligationAmounts(req.user._id, month, year, grossIncome || 0);
     
     res.json({
       income,
-      taxBreakdown: monthlyTaxes
+      taxBreakdown: monthlyTaxes,
+      obligationsUpdated: sync
     });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -84,6 +89,10 @@ exports.delete = async (req, res) => {
     if (!income) {
       return res.status(404).json({ error: 'Ingreso no encontrado' });
     }
+
+    // Resetear montos de obligaciones del mes
+    await syncMonthObligationAmounts(req.user._id, parseInt(month), parseInt(year), 0);
+
     res.json({ message: 'Ingreso eliminado' });
   } catch (error) {
     res.status(500).json({ error: error.message });

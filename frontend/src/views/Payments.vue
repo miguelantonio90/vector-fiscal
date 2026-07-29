@@ -728,7 +728,7 @@ function calcAmountForObligation(obl) {
     if (!m) return null
     const inc = incomes.value.find(i => i.month === m)
     if (!inc || !inc.amount || inc.amount <= 3260) return null
-    return Math.round((inc.amount - 3260) * 0.05 * 100) / 100
+    return Math.round((inc.amount - 3260) * 0.03 * 100) / 100
   }
 
   if (code === '0820132') {

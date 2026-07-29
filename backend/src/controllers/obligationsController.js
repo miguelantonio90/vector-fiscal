@@ -1,5 +1,6 @@
 const { Obligation, Payment, User } = require('../models');
 const { parseVectorFiscalPDF } = require('../utils/vectorFiscalParser');
+const { syncYearObligationAmounts } = require('../utils/syncObligationAmounts');
 
 // Obtener todas las obligaciones del usuario actual
 exports.getAll = async (req, res) => {
@@ -10,6 +11,10 @@ exports.getAll = async (req, res) => {
     if (year) filter.fiscalYear = parseInt(year);
     if (status) filter.status = status;
     if (tributeCode) filter.tributeCode = tributeCode;
+
+    // Sincronizar montos desde ingresos registrados (para obligaciones no pagadas)
+    const syncYear = year ? parseInt(year) : new Date().getFullYear();
+    await syncYearObligationAmounts(req.user._id, syncYear);
     
     let obligations = await Obligation.find(filter).sort({ dueDate: 1 });
     

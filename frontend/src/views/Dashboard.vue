@@ -181,8 +181,16 @@
               <p class="text-white font-mono font-semibold text-lg">
                 {{ formatCurrency(getObligationAmount(obligation)) }}
               </p>
-              <p v-if="!obligation.amount && obligation.tributeCode === '0114022'" class="text-xs text-amber-400">
-                ~estimado
+              <template v-if="getObligationAmount(obligation) > 0">
+                <p v-if="getDaysUntilDue(obligation) < 0" class="text-xs text-red-300/80">
+                  {{ formatCurrency(getPrincipal(obligation)) }} + mora {{ formatCurrency(getMora(obligation)) }}
+                </p>
+                <p v-else-if="isEstimated(obligation)" class="text-xs text-amber-400">
+                  ~estimado
+                </p>
+              </template>
+              <p v-else-if="obligation.tributeCode === '0114022' || obligation.tributeCode === '0510122'" class="text-xs text-slate-500">
+                registra ingreso
               </p>
               <p class="text-xs font-medium" :class="getDaysColor(obligation)">
                 {{ getDaysText(obligation) }}
@@ -284,7 +292,10 @@
           <div class="flex items-center justify-between mt-3 pt-3 border-t border-amber-700/30">
             <div>
               <span class="text-2xl font-display font-bold text-white">{{ formatCurrency(getObligationAmount(nextObligation)) }}</span>
-              <span v-if="!nextObligation.amount && nextObligation.tributeCode === '0114022'" class="text-xs text-amber-400 ml-2">~est.</span>
+              <span v-if="getDaysUntilDue(nextObligation) < 0 && getMora(nextObligation) > 0" class="text-xs text-red-300 ml-2">
+                ({{ formatCurrency(getPrincipal(nextObligation)) }} + mora)
+              </span>
+              <span v-else-if="isEstimated(nextObligation)" class="text-xs text-amber-400 ml-2">~est.</span>
             </div>
             <span class="text-amber-400 font-medium">{{ getDaysText(nextObligation) }}</span>
           </div>
@@ -305,25 +316,102 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { obligationsApi, paymentsApi, predictionsApi } from '../services/api'
+import { obligationsApi, paymentsApi, predictionsApi, incomesApi } from '../services/api'
 import InsightsPanel from '../components/InsightsPanel.vue'
 
 const loading = ref(true)
 const allObligations = ref([])
+const incomes = ref([])
 const summary = ref({ pending: 0, paid: 0, overdue: 0, total: 0, totalAmount: 0, paidAmount: 0 })
 const paymentsSummary = ref({ totalPaid: 0, totalBonus: 0, totalPayments: 0 })
 const toast = ref({ show: false, message: '', type: 'success' })
 const insights = ref([])
 const insightsLoading = ref(true)
+const currentFiscalYear = new Date().getFullYear()
+const monthNames = { enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6, julio: 7, agosto: 8, septiembre: 9, octubre: 10, noviembre: 11, diciembre: 12 }
+
+function getObligationMonth(obligation) {
+  if (!obligation?.period) return null
+  const p = obligation.period.toLowerCase()
+  for (const [name, num] of Object.entries(monthNames)) {
+    if (p.startsWith(name + ':')) return num
+  }
+  return null
+}
+
+function getIncomeForMonth(month) {
+  const inc = incomes.value.find(i => i.month === month)
+  return inc?.amount || inc?.grossIncome || 0
+}
+
+function calcPrincipalFromIncome(obligation) {
+  if (obligation.amount && obligation.amount > 0) return obligation.amount
+  const code = obligation.tributeCode
+  const m = getObligationMonth(obligation)
+  if (!m) return 0
+  const income = getIncomeForMonth(m)
+  if (!income) return 0
+  if (code === '0114022') return Math.round(income * 0.10 * 100) / 100
+  if (code === '0510122') {
+    if (income <= 3260) return 0
+    return Math.round((income - 3260) * 0.03 * 100) / 100
+  }
+  return 0
+}
+
+function countBusinessDays(from, to) {
+  let count = 0
+  const cursor = new Date(from)
+  cursor.setDate(cursor.getDate() + 1)
+  const end = new Date(to)
+  end.setHours(0, 0, 0, 0)
+  while (cursor <= end) {
+    const dow = cursor.getDay()
+    if (dow !== 0 && dow !== 6) count++
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return count
+}
+
+function calcLateSurcharge(principal, dueDate) {
+  if (!principal || !dueDate) return 0
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const due = new Date(dueDate)
+  due.setHours(0, 0, 0, 0)
+  if (today <= due) return 0
+  const lateDays = countBusinessDays(due, today)
+  if (lateDays <= 0) return 0
+  let rate
+  if (lateDays <= 30) rate = 0.02
+  else if (lateDays <= 60) rate = 0.05
+  else rate = Math.min(0.001 * lateDays, 0.40)
+  return Math.round(principal * rate * 100) / 100
+}
+
+function getPrincipal(obligation) {
+  return calcPrincipalFromIncome(obligation)
+}
+
+function getMora(obligation) {
+  return calcLateSurcharge(getPrincipal(obligation), obligation.dueDate)
+}
+
+function getObligationAmount(obligation) {
+  const principal = getPrincipal(obligation)
+  if (!principal) return 0
+  return Math.round((principal + getMora(obligation)) * 100) / 100
+}
+
+function isEstimated(obligation) {
+  return !(obligation.amount && obligation.amount > 0) && getObligationAmount(obligation) > 0
+}
 
 const pendingObligations = computed(() => {
   return allObligations.value
     .filter(o => {
-      // Solo mostrar obligaciones pendientes
-      if (o.status !== 'pendiente') return false
-      // Excluir obligaciones condicionales (0510122) con monto 0
-      // ya que solo aplican si los ingresos superan el mínimo exento
-      if (o.tributeCode === '0510122' && (!o.amount || o.amount === 0)) return false
+      if (o.status !== 'pendiente' && o.status !== 'vencido') return false
+      if (o.tributeCode === '0510122' && !calcPrincipalFromIncome(o)) return false
       return true
     })
     .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
@@ -344,7 +432,7 @@ const paidPercent = computed(() => {
 })
 
 const pendingAmount = computed(() => {
-  return summary.value.pendingAmount || ((summary.value.totalAmount || 0) - (summary.value.paidAmount || 0))
+  return pendingObligations.value.reduce((sum, o) => sum + getObligationAmount(o), 0)
 })
 
 function formatCurrency(amount) {
@@ -379,18 +467,6 @@ function getDaysColor(obligation) {
   return 'text-slate-400'
 }
 
-function getObligationAmount(obligation) {
-  // Si tiene monto definido, usarlo
-  if (obligation.amount && obligation.amount > 0) {
-    return obligation.amount
-  }
-  // Para obligaciones mensuales sin monto, usar el promedio de pagos mensuales
-  if (obligation.tributeCode === '0114022' && summary.value.avgMonthlyPayment) {
-    return summary.value.avgMonthlyPayment
-  }
-  return 0
-}
-
 function showToast(message, type = 'success') {
   toast.value = { show: true, message, type }
   setTimeout(() => {
@@ -398,19 +474,19 @@ function showToast(message, type = 'success') {
   }, 3000)
 }
 
-const currentFiscalYear = new Date().getFullYear()
-
 async function loadData() {
   loading.value = true
   try {
-    const [obligationsRes, summaryRes, paymentsSummaryRes] = await Promise.all([
-      obligationsApi.getAll(),
+    const [obligationsRes, summaryRes, paymentsSummaryRes, incomesRes] = await Promise.all([
+      obligationsApi.getAll({ year: currentFiscalYear }),
       obligationsApi.getSummary(),
-      paymentsApi.getSummary()
+      paymentsApi.getSummary(),
+      incomesApi.getAll({ year: currentFiscalYear })
     ])
     allObligations.value = obligationsRes.data
     summary.value = summaryRes.data
     paymentsSummary.value = paymentsSummaryRes.data
+    incomes.value = (incomesRes.data || []).map(i => ({ ...i, amount: i.amount || i.grossIncome || 0 }))
   } catch (error) {
     console.error('Error loading data:', error)
   } finally {
