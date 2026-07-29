@@ -12,8 +12,8 @@
 const SALES_TAX_RATE = 0.10;
 
 // Aporte a cuenta Impuesto sobre Ingresos Personales (0510122)
-// 3% sobre ingresos que excedan el mínimo exento mensual
-const INCOME_ADVANCE_RATE = 0.03;
+// 5% sobre ingresos que excedan el mínimo exento mensual
+const INCOME_ADVANCE_RATE = 0.05;
 
 // Mínimo exento mensual (39,120 CUP anuales / 12 meses)
 const MONTHLY_EXEMPT = 3260;

@@ -182,15 +182,16 @@
                 {{ formatCurrency(getObligationAmount(obligation)) }}
               </p>
               <template v-if="getObligationAmount(obligation) > 0">
-                <p v-if="getDaysUntilDue(obligation) < 0" class="text-xs text-red-300/80">
+                <p v-if="getDaysUntilDue(obligation) < 0 && getMora(obligation) > 0" class="text-xs text-red-300/80">
                   {{ formatCurrency(getPrincipal(obligation)) }} + mora {{ formatCurrency(getMora(obligation)) }}
+                  <span v-if="isEstimated(obligation)" class="text-amber-400"> · ~aprox.</span>
                 </p>
                 <p v-else-if="isEstimated(obligation)" class="text-xs text-amber-400">
-                  ~estimado
+                  ~aproximado (promedio ingresos)
                 </p>
               </template>
-              <p v-else-if="obligation.tributeCode === '0114022' || obligation.tributeCode === '0510122'" class="text-xs text-slate-500">
-                registra ingreso
+              <p v-else class="text-xs text-slate-500">
+                registra al menos un ingreso
               </p>
               <p class="text-xs font-medium" :class="getDaysColor(obligation)">
                 {{ getDaysText(obligation) }}
@@ -293,9 +294,9 @@
             <div>
               <span class="text-2xl font-display font-bold text-white">{{ formatCurrency(getObligationAmount(nextObligation)) }}</span>
               <span v-if="getDaysUntilDue(nextObligation) < 0 && getMora(nextObligation) > 0" class="text-xs text-red-300 ml-2">
-                ({{ formatCurrency(getPrincipal(nextObligation)) }} + mora)
+                ({{ formatCurrency(getPrincipal(nextObligation)) }} + mora{{ isEstimated(nextObligation) ? ' · ~aprox.' : '' }})
               </span>
-              <span v-else-if="isEstimated(nextObligation)" class="text-xs text-amber-400 ml-2">~est.</span>
+              <span v-else-if="isEstimated(nextObligation)" class="text-xs text-amber-400 ml-2">~aprox.</span>
             </div>
             <span class="text-amber-400 font-medium">{{ getDaysText(nextObligation) }}</span>
           </div>
@@ -344,19 +345,51 @@ function getIncomeForMonth(month) {
   return inc?.amount || inc?.grossIncome || 0
 }
 
-function calcPrincipalFromIncome(obligation) {
-  if (obligation.amount && obligation.amount > 0) return obligation.amount
-  const code = obligation.tributeCode
-  const m = getObligationMonth(obligation)
-  if (!m) return 0
-  const income = getIncomeForMonth(m)
-  if (!income) return 0
-  if (code === '0114022') return Math.round(income * 0.10 * 100) / 100
-  if (code === '0510122') {
-    if (income <= 3260) return 0
-    return Math.round((income - 3260) * 0.03 * 100) / 100
+const avgMonthlyIncome = computed(() => {
+  if (!incomes.value.length) return 0
+  const total = incomes.value.reduce((sum, i) => sum + (i.amount || i.grossIncome || 0), 0)
+  return total / incomes.value.length
+})
+
+/** Calcula el principal a pagar: ingreso del mes, o promedio si no hay, o monto fijo del VF */
+function getPrincipal(obligation) {
+  if (obligation.tributeCode === '0820132' || obligation.tributeCode === '0530222') {
+    return obligation.amount || 0
   }
+
+  // Si ya tiene monto sincronizado desde ingreso del mes, usarlo
+  const m = getObligationMonth(obligation)
+  const monthIncome = m ? getIncomeForMonth(m) : 0
+  if (monthIncome > 0) {
+    if (obligation.tributeCode === '0114022') return Math.round(monthIncome * 0.10 * 100) / 100
+    if (obligation.tributeCode === '0510122') {
+      if (monthIncome <= 3260) return 0
+      return Math.round((monthIncome - 3260) * 0.05 * 100) / 100
+    }
+  }
+
+  // Monto ya guardado en la obligación (sincronizado)
+  if (obligation.amount && obligation.amount > 0) return obligation.amount
+
+  // Aproximado con promedio de ingresos registrados
+  const avg = avgMonthlyIncome.value
+  if (avg > 0) {
+    if (obligation.tributeCode === '0114022') return Math.round(avg * 0.10 * 100) / 100
+    if (obligation.tributeCode === '0510122') {
+      if (avg <= 3260) return 0
+      return Math.round((avg - 3260) * 0.05 * 100) / 100
+    }
+  }
+
   return 0
+}
+
+function isEstimated(obligation) {
+  if (obligation.tributeCode === '0820132' || obligation.tributeCode === '0530222') return false
+  const m = getObligationMonth(obligation)
+  const monthIncome = m ? getIncomeForMonth(m) : 0
+  // Estimado si no hay ingreso concreto del mes pero sí hay promedio o monto
+  return monthIncome <= 0 && getPrincipal(obligation) > 0
 }
 
 function countBusinessDays(from, to) {
@@ -389,10 +422,6 @@ function calcLateSurcharge(principal, dueDate) {
   return Math.round(principal * rate * 100) / 100
 }
 
-function getPrincipal(obligation) {
-  return calcPrincipalFromIncome(obligation)
-}
-
 function getMora(obligation) {
   return calcLateSurcharge(getPrincipal(obligation), obligation.dueDate)
 }
@@ -403,15 +432,11 @@ function getObligationAmount(obligation) {
   return Math.round((principal + getMora(obligation)) * 100) / 100
 }
 
-function isEstimated(obligation) {
-  return !(obligation.amount && obligation.amount > 0) && getObligationAmount(obligation) > 0
-}
-
 const pendingObligations = computed(() => {
   return allObligations.value
     .filter(o => {
       if (o.status !== 'pendiente' && o.status !== 'vencido') return false
-      if (o.tributeCode === '0510122' && !calcPrincipalFromIncome(o)) return false
+      if (o.tributeCode === '0510122' && !getPrincipal(o)) return false
       return true
     })
     .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))

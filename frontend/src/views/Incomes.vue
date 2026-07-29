@@ -93,8 +93,8 @@
                 <span class="text-amber-400">{{ formatCurrency(mes.ingreso.amount * 0.10) }}</span>
               </div>
               <div v-if="mes.ingreso.amount > 3260" class="flex justify-between text-slate-400">
-                <span>0510122 (3%)</span>
-                <span class="text-orange-400">{{ formatCurrency((mes.ingreso.amount - 3260) * 0.03) }}</span>
+                <span>0510122 (5%)</span>
+                <span class="text-orange-400">{{ formatCurrency((mes.ingreso.amount - 3260) * 0.05) }}</span>
               </div>
             </div>
           </div>
@@ -271,15 +271,15 @@
                 <div class="flex items-center justify-between">
                   <div>
                     <p class="text-sm" :class="formIngreso > 3260 ? 'text-slate-300' : 'text-slate-500'">
-                      0510122 - Aporte Ingresos Personales (3%)
+                      0510122 - Aporte Ingresos Personales (5%)
                     </p>
                     <p v-if="formIngreso > 3260" class="text-xs" :class="surchargeAporte ? 'text-red-400' : 'text-slate-500'">
-                      <template v-if="surchargeAporte">3% de {{ formatCurrency(formIngreso - 3260) }}. Vencido el {{ monthlyDueDate }} — {{ surchargeAporte.lateDays }} días hábiles</template>
-                      <template v-else>3% de {{ formatCurrency(formIngreso - 3260) }} (excedente). Pagar antes del <span class="text-orange-400 font-medium">{{ monthlyDueDate }}</span></template>
+                      <template v-if="surchargeAporte">5% de {{ formatCurrency(formIngreso - 3260) }}. Vencido el {{ monthlyDueDate }} — {{ surchargeAporte.lateDays }} días hábiles</template>
+                      <template v-else>5% de {{ formatCurrency(formIngreso - 3260) }} (excedente). Pagar antes del <span class="text-orange-400 font-medium">{{ monthlyDueDate }}</span></template>
                     </p>
                     <p v-else class="text-xs text-emerald-500">No aplica (ingreso &le; $3,260 mínimo exento)</p>
                   </div>
-                  <span v-if="formIngreso > 3260" class="text-orange-400 font-mono font-medium">{{ formatCurrency((formIngreso - 3260) * 0.03) }}</span>
+                  <span v-if="formIngreso > 3260" class="text-orange-400 font-mono font-medium">{{ formatCurrency((formIngreso - 3260) * 0.05) }}</span>
                   <span v-else class="text-slate-600 font-mono">$0.00</span>
                 </div>
                 <div v-if="surchargeAporte" class="flex justify-between mt-1 ml-4">
@@ -310,7 +310,7 @@
             <div class="flex justify-between text-sm pt-3 mt-1 border-t border-slate-600">
               <span class="text-white font-bold">Total cargos mensuales</span>
               <span class="text-onat-red font-mono font-bold">
-                {{ formatCurrency(formIngreso * 0.10 + (formIngreso > 3260 ? (formIngreso - 3260) * 0.03 : 0)) }}
+                {{ formatCurrency(formIngreso * 0.10 + (formIngreso > 3260 ? (formIngreso - 3260) * 0.05 : 0)) }}
               </span>
             </div>
             <div v-if="totalSurcharge > 0" class="flex justify-between text-sm pt-1">
@@ -320,7 +320,7 @@
             <div v-if="totalSurcharge > 0" class="flex justify-between text-sm pt-2 mt-1 border-t border-red-700/40">
               <span class="text-white font-bold text-base">TOTAL A PAGAR</span>
               <span class="text-red-400 font-mono font-bold text-base">
-                {{ formatCurrency(formIngreso * 0.10 + (formIngreso > 3260 ? (formIngreso - 3260) * 0.03 : 0) + totalSurcharge) }}
+                {{ formatCurrency(formIngreso * 0.10 + (formIngreso > 3260 ? (formIngreso - 3260) * 0.05 : 0) + totalSurcharge) }}
               </span>
             </div>
             <p class="text-xs text-slate-500 mt-2">
@@ -498,7 +498,7 @@ const surchargeVentas = computed(() => {
 
 const surchargeAporte = computed(() => {
   if (!editingMes.value || !formIngreso.value || formIngreso.value <= 3260) return null
-  const principal = (formIngreso.value - 3260) * 0.03
+  const principal = (formIngreso.value - 3260) * 0.05
   return calcSurcharge(principal, getMonthlyDueDateObj(editingMes.value.numero))
 })
 
