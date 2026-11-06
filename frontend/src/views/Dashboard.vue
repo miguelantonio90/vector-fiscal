@@ -127,6 +127,52 @@
       </div>
     </div>
 
+    <!-- Plan de atrasos -->
+    <div v-if="!loading && overduePlan.length > 0" class="card border border-red-700/40 bg-gradient-to-br from-red-900/20 to-slate-800/50">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="text-lg font-display font-bold text-white">Plan de atrasos</h3>
+          <p class="text-sm text-slate-400">Qué pagar primero para ponerte al día (más viejo primero)</p>
+        </div>
+        <div class="text-right">
+          <p class="text-xs text-slate-400">TOTAL PARA PONERTE AL DÍA</p>
+          <p class="text-2xl font-display font-bold text-red-400 font-mono">{{ formatCurrency(overduePlanTotal) }}</p>
+        </div>
+      </div>
+
+      <div class="space-y-2">
+        <div
+          v-for="row in overduePlan"
+          :key="row._id"
+          class="flex items-center gap-3 p-3 rounded-xl bg-slate-900/40 border border-red-800/30"
+        >
+          <div class="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0">
+            <span class="text-sm font-bold text-red-400">{{ row.tributeCode === '0820132' ? 'T' : 'M' }}</span>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-white font-medium text-sm truncate">{{ row.description }}</p>
+            <p class="text-xs text-slate-400">{{ row.period }} · {{ row.daysText }}</p>
+            <p class="text-xs text-red-300/80 mt-0.5">
+              {{ formatCurrency(row.principal) }}
+              <template v-if="row.mora > 0"> + mora {{ formatCurrency(row.mora) }}</template>
+              <span v-if="row.estimated" class="text-amber-400"> · ~aprox.</span>
+            </p>
+          </div>
+          <div class="text-right flex-shrink-0">
+            <p class="text-white font-mono font-bold">{{ formatCurrency(row.total) }}</p>
+            <p class="text-xs text-slate-400">Si pagas hasta aquí:</p>
+            <p class="text-xs text-red-400 font-mono font-semibold">{{ formatCurrency(row.runningTotal) }}</p>
+          </div>
+          <router-link
+            :to="`/payments?obligationId=${row._id}`"
+            class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg transition-colors flex-shrink-0"
+          >
+            Pagar
+          </router-link>
+        </div>
+      </div>
+    </div>
+
     <!-- Main Content -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <!-- Pending Obligations -->
@@ -440,6 +486,37 @@ const pendingObligations = computed(() => {
       return true
     })
     .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
+})
+
+const overduePlan = computed(() => {
+  const overdue = pendingObligations.value
+    .filter(o => getDaysUntilDue(o) < 0 && getObligationAmount(o) > 0)
+    .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
+
+  let running = 0
+  return overdue.map(o => {
+    const principal = getPrincipal(o)
+    const mora = getMora(o)
+    const total = getObligationAmount(o)
+    running = Math.round((running + total) * 100) / 100
+    return {
+      _id: o._id,
+      tributeCode: o.tributeCode,
+      description: o.description,
+      period: o.period,
+      principal,
+      mora,
+      total,
+      runningTotal: running,
+      estimated: isEstimated(o),
+      daysText: getDaysText(o)
+    }
+  })
+})
+
+const overduePlanTotal = computed(() => {
+  if (!overduePlan.value.length) return 0
+  return overduePlan.value[overduePlan.value.length - 1].runningTotal
 })
 
 const nextObligation = computed(() => {

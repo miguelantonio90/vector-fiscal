@@ -190,6 +190,15 @@
             <!-- Actions -->
             <div class="flex items-center gap-1 flex-shrink-0">
               <button 
+                @click="openReceipt(payment)"
+                class="p-2 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                title="Comprobante"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </button>
+              <button 
                 @click="editPayment(payment)"
                 class="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
                 title="Editar pago"
@@ -564,10 +573,95 @@
       </div>
     </div>
 
+    <!-- Receipt Modal -->
+    <div v-if="receiptPayment" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 print:static print:bg-white print:p-0 print:inset-auto">
+      <div class="bg-slate-800 rounded-2xl p-6 w-full max-w-lg border border-slate-700 print:bg-white print:border-0 print:rounded-none print:shadow-none print:max-w-none">
+        <div class="flex items-center justify-between mb-6 print:hidden">
+          <h3 class="text-xl font-display font-bold text-white">Comprobante de pago</h3>
+          <div class="flex items-center gap-2">
+            <button @click="printReceipt" class="btn bg-blue-600 hover:bg-blue-700 text-white text-sm">
+              Imprimir / PDF
+            </button>
+            <button @click="receiptPayment = null" class="text-slate-400 hover:text-white">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div id="payment-receipt" class="space-y-4 text-slate-200 print:text-black">
+          <div class="border-b border-slate-600 print:border-black pb-4">
+            <h1 class="text-xl font-bold print:text-black">COMPROBANTE DE PAGO ONAT</h1>
+            <p class="text-sm text-slate-400 print:text-gray-600 mt-1">Constancia de registro de pago tributario</p>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <p class="text-slate-400 print:text-gray-600">Contribuyente</p>
+              <p class="font-medium print:text-black">{{ currentUser?.name || '—' }}</p>
+            </div>
+            <div>
+              <p class="text-slate-400 print:text-gray-600">NIT</p>
+              <p class="font-mono font-medium print:text-black">{{ currentUser?.nit || '—' }}</p>
+            </div>
+            <div>
+              <p class="text-slate-400 print:text-gray-600">Fecha de pago</p>
+              <p class="font-medium print:text-black">{{ formatDateShort(receiptPayment.paymentDate) }}</p>
+            </div>
+            <div>
+              <p class="text-slate-400 print:text-gray-600">Método</p>
+              <p class="font-medium print:text-black">{{ getMethodLabel(receiptPayment.paymentMethod) }}</p>
+            </div>
+          </div>
+
+          <div class="border border-slate-600 print:border-gray-300 rounded-lg p-4 space-y-2 text-sm">
+            <div class="flex justify-between">
+              <span class="text-slate-400 print:text-gray-600">Tributo</span>
+              <span class="font-medium print:text-black text-right">{{ receiptPayment.obligation?.tributeCode }} — {{ receiptPayment.obligation?.description }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-400 print:text-gray-600">Período</span>
+              <span class="font-medium print:text-black">{{ receiptPayment.obligation?.period || '—' }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-400 print:text-gray-600">Principal</span>
+              <span class="font-mono print:text-black">{{ formatCurrency(receiptPayment.amount) }}</span>
+            </div>
+            <div v-if="receiptPayment.lateSurcharge?.surchargeAmount > 0" class="flex justify-between">
+              <span class="text-slate-400 print:text-gray-600">Mora ({{ receiptPayment.lateSurcharge.surchargeRate }}%)</span>
+              <span class="font-mono text-red-400 print:text-red-700">+{{ formatCurrency(receiptPayment.lateSurcharge.surchargeAmount) }}</span>
+            </div>
+            <div v-if="receiptPayment.bonusAmount > 0" class="flex justify-between">
+              <span class="text-slate-400 print:text-gray-600">Bonificación</span>
+              <span class="font-mono text-emerald-400 print:text-green-700">-{{ formatCurrency(receiptPayment.bonusAmount) }}</span>
+            </div>
+            <div class="flex justify-between pt-2 border-t border-slate-600 print:border-gray-300">
+              <span class="font-bold print:text-black">TOTAL PAGADO</span>
+              <span class="font-mono font-bold text-lg print:text-black">{{ formatCurrency(receiptTotalPaid) }}</span>
+            </div>
+          </div>
+
+          <div v-if="receiptPayment.reference" class="text-sm">
+            <p class="text-slate-400 print:text-gray-600">Referencia</p>
+            <p class="font-mono print:text-black">{{ receiptPayment.reference }}</p>
+          </div>
+          <div v-if="receiptPayment.notes" class="text-sm">
+            <p class="text-slate-400 print:text-gray-600">Notas</p>
+            <p class="print:text-black">{{ receiptPayment.notes }}</p>
+          </div>
+
+          <p class="text-xs text-slate-500 print:text-gray-500 pt-4 border-t border-slate-700 print:border-gray-300">
+            Documento generado por MiONAT · {{ new Date().toLocaleString('es-CU') }}
+          </p>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast -->
     <div 
       v-if="toast.show"
-      class="fixed bottom-4 right-4 px-6 py-4 rounded-lg shadow-lg animate-slide-in z-50"
+      class="fixed bottom-4 right-4 px-6 py-4 rounded-lg shadow-lg animate-slide-in z-50 print:hidden"
       :class="toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'"
     >
       <p class="text-white font-medium">{{ toast.message }}</p>
@@ -605,6 +699,22 @@ const yearOptions = computed(() => {
 })
 const toast = ref({ show: false, message: '', type: 'success' })
 const editingPaymentId = ref(null)
+const receiptPayment = ref(null)
+
+const currentUser = computed(() => {
+  try {
+    return JSON.parse(localStorage.getItem('user') || 'null')
+  } catch {
+    return null
+  }
+})
+
+const receiptTotalPaid = computed(() => {
+  if (!receiptPayment.value) return 0
+  const principal = receiptPayment.value.amount || 0
+  const mora = receiptPayment.value.lateSurcharge?.surchargeAmount || 0
+  return Math.round((principal + mora) * 100) / 100
+})
 
 const paymentForm = ref({
   obligationId: '',
@@ -850,6 +960,23 @@ function formatCurrency(amount) {
   }).format(amount || 0)
 }
 
+function formatDateShort(date) {
+  if (!date) return '—'
+  return new Date(date).toLocaleDateString('es-CU', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  })
+}
+
+function openReceipt(payment) {
+  receiptPayment.value = payment
+}
+
+function printReceipt() {
+  window.print()
+}
+
 function getDayFromDate(date) {
   return new Date(date).getDate()
 }
@@ -1006,3 +1133,24 @@ onMounted(() => {
   loadData()
 })
 </script>
+
+<style>
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  #payment-receipt,
+  #payment-receipt * {
+    visibility: visible !important;
+  }
+  #payment-receipt {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    padding: 24px !important;
+    background: white !important;
+    color: black !important;
+  }
+}
+</style>

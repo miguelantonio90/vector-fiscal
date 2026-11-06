@@ -52,11 +52,37 @@
       </div>
       
       <div class="card bg-gradient-to-br from-amber-500/20 to-slate-800/50 border-amber-500/30">
-        <p class="text-slate-400 text-sm">Pendiente por Pagar</p>
+        <p class="text-slate-400 text-sm">Total a depositar</p>
         <p class="text-3xl font-display font-bold text-amber-400 mt-2">
-          {{ formatCurrency(pendingAmount) }}
+          {{ formatCurrency(totalADepositar) }}
         </p>
-        <p class="text-xs text-slate-500 mt-1">{{ obligationsSummary.pending }} pendientes</p>
+        <p class="text-xs text-slate-500 mt-1">Principal + mora ({{ obligationsSummary.pending }} pendientes)</p>
+      </div>
+    </div>
+
+    <!-- Deposit breakdown (screen) -->
+    <div class="card border border-red-700/30 bg-gradient-to-br from-red-900/20 to-slate-800/50 print:hidden">
+      <h3 class="text-lg font-display font-bold text-white mb-4">Resumen a depositar {{ selectedYear }}</h3>
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div>
+          <p class="text-slate-400 text-sm">Total ingresos</p>
+          <p class="text-xl font-bold text-blue-400 font-mono">{{ formatCurrency(totalIngresos) }}</p>
+        </div>
+        <div>
+          <p class="text-slate-400 text-sm">Impuestos mensuales</p>
+          <p class="text-xl font-bold text-amber-400 font-mono">{{ formatCurrency(totalMensualesPrincipal) }}</p>
+          <p class="text-xs text-slate-500">0114022 + 0510122</p>
+        </div>
+        <div>
+          <p class="text-slate-400 text-sm">Seguridad social + mora</p>
+          <p class="text-xl font-bold text-blue-400 font-mono">{{ formatCurrency(totalTrimestralPrincipal + totalTrimestralMora) }}</p>
+          <p class="text-xs text-slate-500">0820132 · {{ trimestralesPendientes.length }} trimestre(s)</p>
+        </div>
+        <div>
+          <p class="text-slate-400 text-sm">TOTAL A DEPOSITAR</p>
+          <p class="text-2xl font-bold text-onat-red font-mono">{{ formatCurrency(totalADepositar) }}</p>
+          <p class="text-xs text-slate-500">Mora acumulada: {{ formatCurrency(totalMora) }}</p>
+        </div>
       </div>
     </div>
 
@@ -97,8 +123,8 @@
               <td class="py-2 text-right">{{ paymentsSummary.totalPayments }}</td>
             </tr>
             <tr class="border-b border-gray-200">
-              <td class="py-2 font-medium text-gray-700">Pendiente por Pagar</td>
-              <td class="py-2 text-right font-bold text-amber-700">{{ formatCurrencyPrint(pendingAmount) }}</td>
+              <td class="py-2 font-medium text-gray-700">Total a depositar</td>
+              <td class="py-2 text-right font-bold text-amber-700">{{ formatCurrencyPrint(totalADepositar) }}</td>
               <td class="py-2 pl-8 font-medium text-gray-700">Obligaciones Pendientes</td>
               <td class="py-2 text-right">{{ obligationsSummary.pending }}</td>
             </tr>
@@ -107,6 +133,53 @@
               <td class="py-2 text-right font-bold text-blue-700">{{ formatCurrencyPrint(paymentsSummary.totalBonus) }}</td>
               <td class="py-2 pl-8 font-medium text-gray-700">Porcentaje Completado</td>
               <td class="py-2 text-right font-bold">{{ paidPercentage.toFixed(1) }}%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Print: Deposit totals for records -->
+      <div class="hidden print:block mb-6">
+        <h2 class="text-lg font-bold text-black mb-3 border-b border-gray-300 pb-2">RESUMEN A DEPOSITAR {{ selectedYear }}</h2>
+        <table class="w-full border-collapse text-sm mb-3">
+          <tbody>
+            <tr class="border-b border-gray-200">
+              <td class="py-2 font-medium text-gray-700">Total ingresos registrados</td>
+              <td class="py-2 text-right font-bold">{{ formatCurrencyPrint(totalIngresos) }}</td>
+            </tr>
+            <tr class="border-b border-gray-200">
+              <td class="py-2 font-medium text-gray-700">Impuestos mensuales (0114022 + 0510122)</td>
+              <td class="py-2 text-right font-bold">{{ formatCurrencyPrint(totalMensualesPrincipal) }}</td>
+            </tr>
+            <tr class="border-b border-gray-200">
+              <td class="py-2 font-medium text-gray-700">Seguridad social trimestral (0820132)</td>
+              <td class="py-2 text-right font-bold">{{ formatCurrencyPrint(totalTrimestralPrincipal) }}</td>
+            </tr>
+            <tr class="border-b border-gray-200">
+              <td class="py-2 font-medium text-gray-700">Mora acumulada (1060122)</td>
+              <td class="py-2 text-right font-bold text-red-700">{{ formatCurrencyPrint(totalMora) }}</td>
+            </tr>
+            <tr class="bg-gray-100">
+              <td class="py-3 font-bold text-black">TOTAL A DEPOSITAR</td>
+              <td class="py-3 text-right font-bold text-lg text-red-700">{{ formatCurrencyPrint(totalADepositar) }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <table v-if="trimestralesPendientes.length" class="w-full border-collapse text-sm">
+          <thead>
+            <tr class="border-b border-gray-300">
+              <th class="py-2 text-left text-gray-600 font-medium">Trimestre 0820132</th>
+              <th class="py-2 text-right text-gray-600 font-medium">Principal</th>
+              <th class="py-2 text-right text-gray-600 font-medium">Mora</th>
+              <th class="py-2 text-right text-gray-600 font-medium">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="t in trimestralesPendientes" :key="t._id" class="border-b border-gray-200">
+              <td class="py-2 text-gray-800">{{ t.period }}</td>
+              <td class="py-2 text-right font-mono">{{ formatCurrencyPrint(t.principal) }}</td>
+              <td class="py-2 text-right font-mono">{{ formatCurrencyPrint(t.mora) }}</td>
+              <td class="py-2 text-right font-mono font-bold">{{ formatCurrencyPrint(t.total) }}</td>
             </tr>
           </tbody>
         </table>
@@ -250,9 +323,9 @@
             </tbody>
             <tfoot v-if="pendingObligations.length > 0">
               <tr class="bg-slate-800/50 print:bg-gray-100 font-bold">
-                <td colspan="4" class="py-3 px-2 text-white print:text-black">TOTAL PENDIENTE</td>
+                <td colspan="4" class="py-3 px-2 text-white print:text-black">TOTAL A DEPOSITAR</td>
                 <td class="py-3 px-2 text-right font-mono text-amber-400 print:text-amber-700 text-lg">
-                  {{ formatCurrencyPrint(pendingAmount) }}
+                  {{ formatCurrencyPrint(totalADepositar) }}
                 </td>
                 <td class="py-3 px-2"></td>
               </tr>
@@ -621,6 +694,7 @@
 <script setup>
 import { ref, computed, onMounted, watch, h } from 'vue'
 import { obligationsApi, paymentsApi, incomesApi, predictionsApi } from '../services/api'
+import { useDepositTotals } from '../composables/useDepositTotals'
 
 const selectedYear = ref(new Date().getFullYear())
 const yearOptions = [new Date().getFullYear() - 2, new Date().getFullYear() - 1, new Date().getFullYear()]
@@ -633,6 +707,17 @@ const incomeSummary = ref({ months: [], totals: null })
 const declaration = ref(null)
 const allPayments = ref([])
 const allObligations = ref([])
+
+const {
+  totalIngresos,
+  totalADepositar,
+  totalMensualesPrincipal,
+  totalTrimestralPrincipal,
+  totalTrimestralMora,
+  totalMora,
+  trimestralesPendientes,
+  loadDepositTotals
+} = useDepositTotals(selectedYear)
 
 const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
@@ -830,7 +915,8 @@ async function loadData() {
       incomesApi.getAnnualSummary(selectedYear.value),
       paymentsApi.getAll({ year: selectedYear.value }),
       obligationsApi.getAll({ year: selectedYear.value }),
-      predictionsApi.getAnnualDeclaration(selectedYear.value)
+      predictionsApi.getAnnualDeclaration(selectedYear.value),
+      loadDepositTotals(selectedYear.value)
     ])
     
     obligationsSummary.value = obligationsRes.data

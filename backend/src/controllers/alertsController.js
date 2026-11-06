@@ -1,10 +1,14 @@
-const { Alert, Obligation } = require('../models');
+const { Alert, Obligation, Income } = require('../models');
+const { buildAmountSuffix } = require('../utils/lateSurcharge');
 
-// Obtener todas las alertas
+// Obtener todas las alertas del usuario
 exports.getAll = async (req, res) => {
   try {
     const { isRead } = req.query;
-    const filter = {};
+    const userObligations = await Obligation.find({ user: req.user._id }).select('_id');
+    const obligationIds = userObligations.map(o => o._id);
+
+    const filter = { obligation: { $in: obligationIds } };
     if (isRead !== undefined) filter.isRead = isRead === 'true';
     
     const alerts = await Alert.find(filter)
@@ -22,14 +26,24 @@ exports.generateAlerts = async (req, res) => {
   try {
     const today = new Date();
     const alerts = [];
-    
-    // Buscar obligaciones pendientes
-    const pendingObligations = await Obligation.find({ status: 'pendiente' });
+    const year = today.getFullYear();
+
+    const pendingObligations = await Obligation.find({
+      user: req.user._id,
+      status: { $in: ['pendiente', 'vencido'] }
+    });
+
+    const incomes = await Income.find({ user: req.user._id, year });
+    const incomeByMonth = {};
+    for (const inc of incomes) {
+      incomeByMonth[inc.month] = inc.grossIncome || 0;
+    }
     
     for (const obligation of pendingObligations) {
       const dueDate = new Date(obligation.dueDate);
       const diffTime = dueDate - today;
       const daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const amountSuffix = buildAmountSuffix(obligation, incomeByMonth, today);
       
       // Alerta de vencido
       if (daysUntilDue < 0) {
@@ -42,15 +56,16 @@ exports.generateAlerts = async (req, res) => {
           const alert = new Alert({
             obligation: obligation._id,
             type: 'vencido',
-            message: `¡VENCIDO! ${obligation.description} - ${obligation.period} venció hace ${Math.abs(daysUntilDue)} días`,
+            message: `¡VENCIDO! ${obligation.tributeCode || ''} ${obligation.period || obligation.description} venció hace ${Math.abs(daysUntilDue)} días${amountSuffix}`,
             daysBefore: daysUntilDue
           });
           await alert.save();
           alerts.push(alert);
           
-          // Actualizar estado de la obligación
-          obligation.status = 'vencido';
-          await obligation.save();
+          if (obligation.status === 'pendiente') {
+            obligation.status = 'vencido';
+            await obligation.save();
+          }
         }
       }
       // Alertas de próximo vencimiento (7, 3, 1 día)
@@ -66,7 +81,7 @@ exports.generateAlerts = async (req, res) => {
           const alert = new Alert({
             obligation: obligation._id,
             type: 'vencimiento_proximo',
-            message: `${urgency} ${obligation.description} vence en ${daysUntilDue} día${daysUntilDue > 1 ? 's' : ''} (${obligation.period})`,
+            message: `${urgency} ${obligation.tributeCode || ''} ${obligation.period || obligation.description} vence en ${daysUntilDue} día${daysUntilDue > 1 ? 's' : ''}${amountSuffix}`.trim(),
             daysBefore: daysUntilDue
           });
           await alert.save();
@@ -74,7 +89,7 @@ exports.generateAlerts = async (req, res) => {
         }
       }
       
-      // Alerta de bonificación disponible (antes de fecha límite)
+      // Alerta de bonificación solo si aún no venció
       if (daysUntilDue > 0 && daysUntilDue <= 30) {
         const existingBonusAlert = await Alert.findOne({
           obligation: obligation._id,
@@ -85,7 +100,7 @@ exports.generateAlerts = async (req, res) => {
           const alert = new Alert({
             obligation: obligation._id,
             type: 'bonificacion_disponible',
-            message: `Paga ${obligation.description} antes del ${formatDate(dueDate)} y obtén 5% de bonificación`,
+            message: `Paga ${obligation.description} (${obligation.period}) antes del ${formatDate(dueDate)} y obtén 5% de bonificación${amountSuffix}`,
             daysBefore: daysUntilDue
           });
           await alert.save();
@@ -122,10 +137,15 @@ exports.markAsRead = async (req, res) => {
   }
 };
 
-// Marcar todas como leídas
+// Marcar todas como leídas (solo del usuario)
 exports.markAllAsRead = async (req, res) => {
   try {
-    await Alert.updateMany({ isRead: false }, { isRead: true });
+    const userObligations = await Obligation.find({ user: req.user._id }).select('_id');
+    const obligationIds = userObligations.map(o => o._id);
+    await Alert.updateMany(
+      { isRead: false, obligation: { $in: obligationIds } },
+      { isRead: true }
+    );
     res.json({ message: 'Todas las alertas marcadas como leídas' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -145,13 +165,18 @@ exports.delete = async (req, res) => {
   }
 };
 
-// Obtener resumen de alertas
+// Obtener resumen de alertas del usuario
 exports.getSummary = async (req, res) => {
   try {
+    const userObligations = await Obligation.find({ user: req.user._id }).select('_id');
+    const obligationIds = userObligations.map(o => o._id);
+    const base = { obligation: { $in: obligationIds } };
+
     const [total, unread, byType] = await Promise.all([
-      Alert.countDocuments(),
-      Alert.countDocuments({ isRead: false }),
+      Alert.countDocuments(base),
+      Alert.countDocuments({ ...base, isRead: false }),
       Alert.aggregate([
+        { $match: base },
         { $group: { _id: '$type', count: { $sum: 1 } } }
       ])
     ]);
@@ -175,4 +200,3 @@ function formatDate(date) {
     month: 'short'
   });
 }
-

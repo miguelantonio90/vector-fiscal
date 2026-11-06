@@ -26,7 +26,7 @@
           </div>
           <div>
             <p class="text-xs text-slate-400">Ingresos Totales</p>
-            <p class="text-lg font-bold text-white font-mono">{{ formatCurrency(cashFlow?.summary?.totalIncome || 0) }}</p>
+            <p class="text-lg font-bold text-white font-mono">{{ formatCurrency(totalIngresos || cashFlow?.summary?.totalIncome || 0) }}</p>
           </div>
         </div>
       </div>
@@ -37,8 +37,8 @@
             <span class="text-xl">📊</span>
           </div>
           <div>
-            <p class="text-xs text-slate-400">Impuestos Estimados</p>
-            <p class="text-lg font-bold text-white font-mono">{{ formatCurrency(cashFlow?.summary?.totalTaxes || 0) }}</p>
+            <p class="text-xs text-slate-400">Total a depositar</p>
+            <p class="text-lg font-bold text-red-400 font-mono">{{ formatCurrency(totalADepositar) }}</p>
           </div>
         </div>
       </div>
@@ -64,6 +64,50 @@
             <p class="text-xs text-slate-400">Ahorro Bonificaciones</p>
             <p class="text-lg font-bold text-purple-400 font-mono">{{ formatCurrency(cashFlow?.summary?.totalSaved || 0) }}</p>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Deposit breakdown -->
+    <div class="bg-slate-800/50 backdrop-blur-sm rounded-xl p-5 border border-red-700/30">
+      <h3 class="text-lg font-semibold text-white mb-4">Resumen a depositar {{ selectedYear }}</h3>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div>
+          <p class="text-xs text-slate-400">Impuestos mensuales</p>
+          <p class="text-xl font-bold text-amber-400 font-mono">{{ formatCurrency(totalMensualesPrincipal) }}</p>
+          <p class="text-xs text-slate-500">0114022 + 0510122</p>
+        </div>
+        <div>
+          <p class="text-xs text-slate-400">Seguridad social</p>
+          <p class="text-xl font-bold text-blue-400 font-mono">{{ formatCurrency(totalTrimestralPrincipal) }}</p>
+          <p class="text-xs text-slate-500">0820132 · {{ trimestralesPendientes.length }} trimestre(s)</p>
+        </div>
+        <div>
+          <p class="text-xs text-slate-400">Mora acumulada</p>
+          <p class="text-xl font-bold text-red-400 font-mono">{{ formatCurrency(totalMora) }}</p>
+          <p class="text-xs text-slate-500">Recargo 1060122</p>
+        </div>
+        <div>
+          <p class="text-xs text-slate-400">TOTAL A DEPOSITAR</p>
+          <p class="text-2xl font-bold text-red-400 font-mono">{{ formatCurrency(totalADepositar) }}</p>
+          <p class="text-xs text-slate-500">Principal + mora</p>
+        </div>
+      </div>
+      <div v-if="trimestralesPendientes.length" class="mt-4 pt-4 border-t border-slate-700/50 space-y-2">
+        <p class="text-sm font-medium text-slate-300 mb-2">Trimestrales pendientes (0820132)</p>
+        <div
+          v-for="t in trimestralesPendientes"
+          :key="t._id"
+          class="flex items-center justify-between text-sm py-1.5 px-3 rounded-lg bg-slate-900/40"
+        >
+          <div>
+            <p class="text-slate-300">{{ t.period }}</p>
+            <p v-if="t.mora > 0" class="text-xs text-red-400">{{ formatCurrency(t.principal) }} + mora {{ formatCurrency(t.mora) }}</p>
+            <p v-else class="text-xs text-slate-500">Sin mora</p>
+          </div>
+          <span class="font-mono font-bold" :class="t.mora > 0 ? 'text-red-400' : 'text-blue-400'">
+            {{ formatCurrency(t.total) }}
+          </span>
         </div>
       </div>
     </div>
@@ -369,6 +413,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { predictionsApi } from '../services/api'
+import { useDepositTotals } from '../composables/useDepositTotals'
 
 const loading = ref(true)
 const selectedYear = ref(new Date().getFullYear())
@@ -376,6 +421,16 @@ const yearOptions = [new Date().getFullYear() - 2, new Date().getFullYear() - 1,
 const selectedMonth = ref(null)
 const cashFlow = ref(null)
 const predictions = ref(null)
+
+const {
+  totalIngresos,
+  totalADepositar,
+  totalMensualesPrincipal,
+  totalTrimestralPrincipal,
+  totalMora,
+  trimestralesPendientes,
+  loadDepositTotals
+} = useDepositTotals(selectedYear)
 
 const maxIncome = computed(() => {
   if (!cashFlow.value?.months) return 1
@@ -417,7 +472,8 @@ const loadData = async () => {
   try {
     const [cashFlowRes, summaryRes] = await Promise.all([
       predictionsApi.getCashFlow(selectedYear.value),
-      predictionsApi.getSummary(selectedYear.value)
+      predictionsApi.getSummary(selectedYear.value),
+      loadDepositTotals(selectedYear.value)
     ])
     
     cashFlow.value = cashFlowRes.data
