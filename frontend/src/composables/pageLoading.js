@@ -10,7 +10,8 @@ const FETCH_ROUTES = new Set([
   'AnnualDeclaration',
   'Reports',
   'VectorFiscal',
-  'Users'
+  'Users',
+  'Profile'
 ])
 
 export const pageLoading = ref(false)

@@ -416,8 +416,10 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { usePageLoading } from '../composables/pageLoading'
 import { authApi, obligationsApi, paymentsApi, telegramApi } from '../services/api'
 
+const loading = usePageLoading('Profile')
 const user = ref(null)
 const stats = ref({
   totalPayments: 0,
@@ -681,8 +683,12 @@ const formatDate = (dateStr) => {
   return d.toLocaleDateString('es-CU', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-onMounted(() => {
-  loadProfile()
-  loadStats()
+onMounted(async () => {
+  loading.value = true
+  try {
+    await Promise.all([loadProfile(), loadStats()])
+  } finally {
+    loading.value = false
+  }
 })
 </script>
