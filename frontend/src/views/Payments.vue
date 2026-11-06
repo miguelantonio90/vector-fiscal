@@ -532,12 +532,29 @@
             </div>
 
             <!-- Info para calcular automático -->
-            <div v-else-if="paymentForm.bonusMode === 'calculate'" class="space-y-2">
-              <p class="text-xs text-slate-400">El sistema calculará automáticamente las bonificaciones:</p>
-              <div class="flex gap-4 text-xs text-slate-500">
-                <span v-if="isElectronicPayment" class="text-blue-400">+3% canal electrónico</span>
-                <span v-if="isDeclarationBonus" class="text-emerald-400">+5% DJ hasta el 28 de febrero</span>
+            <div v-else-if="paymentForm.bonusMode === 'calculate'" class="space-y-3">
+              <div v-if="autoBonusPreview" class="rounded-lg bg-slate-900/50 border border-slate-700/50 p-3 space-y-1.5">
+                <div class="flex justify-between text-sm">
+                  <span class="text-slate-400">Principal</span>
+                  <span class="font-mono text-slate-200">{{ formatCurrency(autoBonusPreview.principal) }}</span>
+                </div>
+                <div v-if="autoBonusPreview.mora > 0" class="flex justify-between text-sm">
+                  <span class="text-red-400">Mora</span>
+                  <span class="font-mono text-red-400">+{{ formatCurrency(autoBonusPreview.mora) }}</span>
+                </div>
+                <div v-for="line in autoBonusPreview.lines" :key="line.label" class="flex justify-between text-sm">
+                  <span class="text-emerald-400">{{ line.label }}</span>
+                  <span class="font-mono text-emerald-400">-{{ formatCurrency(line.amount) }}</span>
+                </div>
+                <p v-if="autoBonusPreview.lines.length === 0" class="text-xs text-slate-500">
+                  Este pago no tiene bonificación. El 3% es solo por Transfermóvil o EnZona, y el 5% solo en la declaración jurada hasta el 28 de febrero.
+                </p>
+                <div class="flex justify-between items-center pt-2 border-t border-slate-700/60">
+                  <span class="text-sm font-semibold text-white">Vas a pagar</span>
+                  <span class="font-mono text-amber-300 text-base font-bold">{{ formatCurrency(autoBonusPreview.toPay) }}</span>
+                </div>
               </div>
+              <p v-else class="text-xs text-slate-500">Elige la obligación y el monto para ver cuánto vas a pagar.</p>
             </div>
 
             <!-- Info para sin bonificación -->
@@ -573,7 +590,7 @@
           </div>
 
           <!-- Bonus Preview (when auto-calculating) -->
-          <div v-if="selectedObligation && paymentForm.amount && !surchargePreview && !paymentForm.bonusAlreadyApplied" class="p-4 bg-emerald-900/20 rounded-xl border border-emerald-700/30">
+          <div v-if="paymentForm.bonusMode !== 'calculate' && selectedObligation && paymentForm.amount && !surchargePreview && !paymentForm.bonusAlreadyApplied" class="p-4 bg-emerald-900/20 rounded-xl border border-emerald-700/30">
             <p class="text-sm text-emerald-400 font-medium mb-2">Bonificaciones que se aplicarán:</p>
             <div class="flex justify-between text-sm">
               <span class="text-slate-300">DJ hasta el 28 de febrero (5%)</span>
@@ -969,6 +986,39 @@ const isDeclarationBonus = computed(() => {
   if (m < 2) return true
   if (m > 2) return false
   return d <= 28
+})
+
+const autoBonusPreview = computed(() => {
+  if (paymentForm.value.bonusMode !== 'calculate') return null
+  const principal = Number(principalAmount.value || paymentForm.value.amount) || 0
+  if (principal <= 0) return null
+  const mora = surchargePreview.value?.surchargeAmount || 0
+  const due = Math.round((principal + mora) * 100) / 100
+  const lines = []
+  let percent = 0
+  if (isElectronicPayment.value) {
+    percent += 3
+    lines.push({
+      label: 'Transfermóvil o EnZona (3%)',
+      amount: Math.round(principal * 0.03 * 100) / 100
+    })
+  }
+  if (isDeclarationBonus.value) {
+    percent += 5
+    lines.push({
+      label: 'DJ hasta el 28 de febrero (5%)',
+      amount: Math.round(principal * 0.05 * 100) / 100
+    })
+  }
+  const bonus = Math.round(principal * percent / 100 * 100) / 100
+  return {
+    principal,
+    mora,
+    due,
+    lines,
+    bonus,
+    toPay: Math.round((due - bonus) * 100) / 100
+  }
 })
 
 const isLatePayment = computed(() => {
