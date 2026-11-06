@@ -57,6 +57,13 @@ export const authApi = {
   }
 }
 
+// Telegram API
+export const telegramApi = {
+  status: () => api.get('/telegram/status'),
+  createLinkCode: () => api.post('/telegram/link-code'),
+  unlink: () => api.delete('/telegram/unlink')
+}
+
 // Obligations API
 export const obligationsApi = {
   getAll: (params = {}) => api.get('/obligations', { params }),

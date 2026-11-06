@@ -24,6 +24,10 @@ services:
         sync: false
       - key: TELEGRAM_BOT_TOKEN
         sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
+      - key: TELEGRAM_WEBHOOK_BASE
+        value: https://mionat-api.onrender.com
       - key: FRONTEND_URL
         value: https://mionat-web.onrender.com
 

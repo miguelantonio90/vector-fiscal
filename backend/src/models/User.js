@@ -33,6 +33,16 @@ const userSchema = new mongoose.Schema({
     trim: true,
     default: ''
   },
+  // Código temporal para vincular Telegram (/start CODIGO)
+  telegramLinkCode: {
+    type: String,
+    trim: true,
+    uppercase: true,
+    sparse: true
+  },
+  telegramLinkExpires: {
+    type: Date
+  },
   // Último Vector Fiscal subido
   vectorFiscal: {
     filename: String,

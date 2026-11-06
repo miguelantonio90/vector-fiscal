@@ -82,19 +82,76 @@
               <p class="mt-2 text-xs text-slate-500">El NIT es tu identificador único en el sistema</p>
             </div>
 
-            <!-- Telegram Chat ID -->
-            <div>
-              <label class="block text-sm font-medium text-slate-300 mb-2">Telegram Chat ID</label>
-              <input
-                v-model="editForm.telegramChatId"
-                type="text"
-                class="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
-                placeholder="Ej: 123456789"
-              />
-              <p class="mt-2 text-xs text-slate-500">
-                Habla con el bot de MiONAT en Telegram y envía <span class="text-slate-300">/start</span>;
-                luego pega aquí tu chat id para recibir recordatorios diarios.
+            <!-- Telegram -->
+            <div class="p-4 rounded-xl border border-slate-600/60 bg-slate-900/40 space-y-3">
+              <div class="flex items-center justify-between gap-2">
+                <label class="block text-sm font-medium text-slate-300">Telegram</label>
+                <span
+                  class="text-xs px-2 py-0.5 rounded-full"
+                  :class="telegramStatus.linked ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-700 text-slate-400'"
+                >
+                  {{ telegramStatus.linked ? 'Vinculado' : 'No vinculado' }}
+                </span>
+              </div>
+
+              <p v-if="telegramStatus.configured && telegramStatus.username" class="text-xs text-slate-400">
+                Bot: <span class="text-slate-200">@{{ telegramStatus.username }}</span>
               </p>
+              <p v-else-if="!telegramStatus.configured" class="text-xs text-amber-400">
+                El bot aún no tiene token. Crea el bot en BotFather y configura
+                <span class="font-mono">TELEGRAM_BOT_TOKEN</span>.
+              </p>
+
+              <div>
+                <label class="block text-xs text-slate-500 mb-1">Chat ID</label>
+                <input
+                  v-model="editForm.telegramChatId"
+                  type="text"
+                  class="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                  placeholder="Se rellena al vincular con el bot"
+                />
+              </div>
+
+              <div class="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  @click="generateTelegramLink"
+                  :disabled="linkingTelegram || !telegramStatus.configured"
+                  class="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-colors"
+                >
+                  {{ linkingTelegram ? 'Generando…' : 'Generar código Telegram' }}
+                </button>
+                <button
+                  v-if="telegramStatus.linked"
+                  type="button"
+                  @click="unlinkTelegram"
+                  class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium rounded-lg transition-colors"
+                >
+                  Desvincular
+                </button>
+                <a
+                  v-if="telegramDeepLink"
+                  :href="telegramDeepLink"
+                  target="_blank"
+                  rel="noopener"
+                  class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg transition-colors"
+                >
+                  Abrir bot con código
+                </a>
+              </div>
+
+              <div v-if="telegramLinkCode" class="text-xs text-slate-300 space-y-1">
+                <p>
+                  Código:
+                  <span class="font-mono text-emerald-300 text-sm tracking-widest">{{ telegramLinkCode }}</span>
+                  <span class="text-slate-500">(15 min)</span>
+                </p>
+                <p class="text-slate-500">
+                  En Telegram envía
+                  <span class="text-slate-300 font-mono">/start {{ telegramLinkCode }}</span>
+                  al bot, o usa el botón de arriba.
+                </p>
+              </div>
             </div>
 
             <!-- Save Profile Button -->
@@ -359,7 +416,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { authApi, obligationsApi, paymentsApi } from '../services/api'
+import { authApi, obligationsApi, paymentsApi, telegramApi } from '../services/api'
 
 const user = ref(null)
 const stats = ref({
@@ -395,6 +452,10 @@ const showCurrentPassword = ref(false)
 const showNewPassword = ref(false)
 const isDragging = ref(false)
 const selectedFile = ref(null)
+const telegramStatus = ref({ configured: false, linked: false, username: null })
+const linkingTelegram = ref(false)
+const telegramLinkCode = ref('')
+const telegramDeepLink = ref('')
 
 const userInitials = computed(() => {
   if (!user.value?.name) return 'U'
@@ -419,6 +480,47 @@ const clearMessages = () => {
   errorMessage.value = ''
 }
 
+const loadTelegramStatus = async () => {
+  try {
+    const res = await telegramApi.status()
+    telegramStatus.value = res.data
+    if (res.data.chatId) {
+      editForm.value.telegramChatId = res.data.chatId
+    }
+  } catch (error) {
+    telegramStatus.value = { configured: false, linked: false, username: null }
+  }
+}
+
+const generateTelegramLink = async () => {
+  clearMessages()
+  linkingTelegram.value = true
+  try {
+    const res = await telegramApi.createLinkCode()
+    telegramLinkCode.value = res.data.code
+    telegramDeepLink.value = res.data.deepLink || ''
+    successMessage.value = res.data.instructions || 'Código generado'
+  } catch (error) {
+    errorMessage.value = error.response?.data?.error || 'No se pudo generar el código'
+  } finally {
+    linkingTelegram.value = false
+  }
+}
+
+const unlinkTelegram = async () => {
+  clearMessages()
+  try {
+    await telegramApi.unlink()
+    editForm.value.telegramChatId = ''
+    telegramLinkCode.value = ''
+    telegramDeepLink.value = ''
+    await loadTelegramStatus()
+    successMessage.value = 'Telegram desvinculado'
+  } catch (error) {
+    errorMessage.value = error.response?.data?.error || 'No se pudo desvincular'
+  }
+}
+
 const loadProfile = async () => {
   try {
     const response = await authApi.me()
@@ -436,6 +538,7 @@ const loadProfile = async () => {
       editForm.value.telegramChatId = user.value.telegramChatId || ''
     }
   }
+  await loadTelegramStatus()
 }
 
 const loadStats = async () => {

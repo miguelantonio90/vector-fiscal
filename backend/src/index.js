@@ -56,6 +56,9 @@ app.use('/api/calculator', auth, require('./routes/calculator'));
 // Cron de Telegram (protegido por x-cron-secret, sin JWT)
 app.post('/api/alerts/telegram-remind', require('./controllers/alertsController').telegramRemind);
 
+// Bot de Telegram (webhook público + rutas auth)
+app.use('/api/telegram', require('./routes/telegram'));
+
 app.use('/api/alerts', auth, require('./routes/alerts'));
 app.use('/api/predictions', auth, require('./routes/predictions'));
 
@@ -80,5 +83,14 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 MiONAT API corriendo en puerto ${PORT}`);
   console.log(`📊 Entorno: ${process.env.NODE_ENV || 'development'}`);
+
+  // En desarrollo: escuchar mensajes del bot por long polling
+  if (process.env.NODE_ENV !== 'production' || process.env.TELEGRAM_POLLING === '1') {
+    try {
+      require('./services/telegramBot').startPolling();
+    } catch (err) {
+      console.warn('[telegram] No se pudo iniciar polling:', err.message);
+    }
+  }
 });
 
