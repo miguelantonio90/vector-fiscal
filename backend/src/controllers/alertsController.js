@@ -313,6 +313,16 @@ async function runTelegramReminders() {
 
 exports.runTelegramReminders = runTelegramReminders;
 
+// POST /api/alerts/telegram-send — admin envía ahora a los usuarios vinculados
+exports.sendTelegramReminders = async (req, res) => {
+  try {
+    const result = await runTelegramReminders();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // POST /api/alerts/telegram-remind — protegido por x-cron-secret
 exports.telegramRemind = async (req, res) => {
   try {
@@ -327,8 +337,8 @@ exports.telegramRemind = async (req, res) => {
   }
 };
 
-// Tres avisos al día, hora de Cuba (America/Havana, UTC−5)
-const REMINDER_SLOTS = ['09:00', '12:30', '17:00'];
+// Un aviso al día, 9:00 hora de Cuba (America/Havana)
+const REMINDER_SLOTS = ['09:00'];
 const sentSlots = new Set();
 
 function cubaClock(date = new Date()) {

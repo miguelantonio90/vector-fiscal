@@ -123,6 +123,7 @@ export const alertsApi = {
   getAll: (params = {}) => api.get('/alerts', { params }),
   getSummary: () => api.get('/alerts/summary'),
   generate: () => api.post('/alerts/generate'),
+  sendTelegramReminders: () => api.post('/alerts/telegram-send'),
   markAsRead: (id) => api.put(`/alerts/${id}/read`),
   markAllAsRead: () => api.put('/alerts/read-all'),
   delete: (id) => api.delete(`/alerts/${id}`)

@@ -88,6 +88,18 @@
         </select>
 
         <button
+          @click="sendTelegramReminders"
+          :disabled="sendingReminders"
+          class="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+        >
+          <span v-if="sendingReminders" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+          <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+          {{ sendingReminders ? 'Enviando…' : 'Enviar notificaciones' }}
+        </button>
+
+        <button
           @click="openCreateModal"
           class="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-colors"
         >
@@ -98,6 +110,10 @@
         </button>
       </div>
     </div>
+
+    <p v-if="remindResult" class="text-sm rounded-lg px-4 py-3 border" :class="remindResult.ok ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-red-500/10 border-red-500/30 text-red-300'">
+      {{ remindResult.text }}
+    </p>
 
     <!-- Tabla de usuarios -->
     <div class="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden">
@@ -396,7 +412,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { usePageLoading } from '../composables/pageLoading'
-import { usersApi } from '../services/api'
+import { usersApi, alertsApi } from '../services/api'
 
 // Estado
 const loading = usePageLoading('Users')
@@ -427,6 +443,29 @@ const form = ref({
 const showDeleteModal = ref(false)
 const userToDelete = ref(null)
 const deleting = ref(false)
+const sendingReminders = ref(false)
+const remindResult = ref(null)
+
+async function sendTelegramReminders() {
+  if (!confirm('¿Enviar ahora el recordatorio de obligaciones a todos los usuarios con Telegram vinculado?')) return
+  sendingReminders.value = true
+  remindResult.value = null
+  try {
+    const { data } = await alertsApi.sendTelegramReminders()
+    const failed = data.errors?.length || 0
+    remindResult.value = {
+      ok: failed === 0,
+      text: `Enviadas: ${data.sent}. Sin nada que avisar: ${data.skipped}. Fallidas: ${failed}.`
+    }
+  } catch (error) {
+    remindResult.value = {
+      ok: false,
+      text: error.response?.data?.error || 'No se pudieron enviar las notificaciones'
+    }
+  } finally {
+    sendingReminders.value = false
+  }
+}
 
 // Usuario actual (para evitar auto-eliminación)
 const currentUser = computed(() => {
