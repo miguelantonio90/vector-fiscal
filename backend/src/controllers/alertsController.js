@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { Alert, Obligation, Income, User } = require('../models');
-const { buildAmountSuffix, calculateLateSurcharge, resolvePrincipal } = require('../utils/lateSurcharge');
+const { buildAmountSuffix, calculateLateSurcharge, calendarParts, resolvePrincipal } = require('../utils/lateSurcharge');
 
 const TRIBUTE_NAMES = {
   '0114022': 'Ventas y servicios',
@@ -230,18 +230,16 @@ function formatDate(date) {
 }
 
 function daysUntilDue(dueDate, today) {
-  const due = new Date(dueDate);
-  due.setHours(0, 0, 0, 0);
-  const t = new Date(today);
-  t.setHours(0, 0, 0, 0);
-  return Math.round((due - t) / 86400000);
+  const due = calendarParts(dueDate);
+  const now = calendarParts(today);
+  if (!due || !now) return 0;
+  const dueUtc = Date.UTC(due.y, due.m - 1, due.d);
+  const nowUtc = Date.UTC(now.y, now.m - 1, now.d);
+  return Math.round((dueUtc - nowUtc) / 86400000);
 }
 
 function formatMoney(n) {
-  return Number(n || 0).toLocaleString('es-CU', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
+  return Number(n || 0).toFixed(2);
 }
 
 async function sendTelegramMessage(token, chatId, text) {
@@ -270,9 +268,7 @@ async function runTelegramReminders() {
   }
 
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
   const fiscalYear = currentFiscalYear(today);
-  const remindDays = new Set([7, 3, 1]);
 
   const users = await User.find({
     telegramChatId: { $exists: true, $nin: [null, ''] }
@@ -306,21 +302,21 @@ async function runTelegramReminders() {
         let sumPrincipal = 0;
         let sumMora = 0;
         for (const obl of obligations) {
-          const days = daysUntilDue(obl.dueDate, today);
-          const overdue = days < 0;
-          if (!overdue && !remindDays.has(days)) continue;
-
           const principal = resolvePrincipal(obl, incomeByYear[obl.fiscalYear] || {});
           if (!principal) continue;
 
+          const days = daysUntilDue(obl.dueDate, today);
+          const overdue = days < 0;
           const surcharge = calculateLateSurcharge(principal, obl.dueDate, today);
           const mora = surcharge?.surchargeAmount || 0;
           const total = Math.round((principal + mora) * 100) / 100;
           const when = overdue
             ? `VENCIDA hace ${Math.abs(days)} día(s)`
-            : days === 1
-              ? 'vence mañana'
-              : `vence en ${days} días`;
+            : days === 0
+              ? 'vence hoy'
+              : days === 1
+                ? 'vence mañana'
+                : `vence en ${days} días`;
           const name = TRIBUTE_NAMES[obl.tributeCode] || obl.description || '';
           const code = obl.tributeCode || '';
 
@@ -362,7 +358,7 @@ async function runTelegramReminders() {
           totalsByCode.join('\n') +
           `\nPrincipal: $${formatMoney(sumPrincipal)}` +
           `\nMora: $${formatMoney(sumMora)}` +
-          `\n<b>Total a pagar: $${formatMoney(sumTotal)}</b>`;
+          `\n<b>Total a depositar: $${formatMoney(sumTotal)}</b>`;
 
       await sendTelegramMessage(token, user.telegramChatId, message);
       sent += 1;

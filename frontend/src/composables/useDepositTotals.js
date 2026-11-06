@@ -40,6 +40,18 @@ export function useDepositTotals(yearRef) {
     return calculateLateFee(principal, dueDate)
   }
 
+  const monthNames = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+
+  function dueDateForMonth(mesNumero) {
+    const name = monthNames[mesNumero]
+    const obl = obligaciones.value.find(o =>
+      o.tributeCode === '0114022' &&
+      o.dueDate &&
+      String(o.period || '').toLowerCase().startsWith(name + ':')
+    )
+    return obl?.dueDate || getMonthlyDueDateObj(mesNumero)
+  }
+
   function cargosDelMes(mesNumero) {
     const ingreso = ingresos.value.find(ing => ing.month === mesNumero)
     const amount = ingreso?.amount || ingreso?.grossIncome || 0
@@ -47,7 +59,7 @@ export function useDepositTotals(yearRef) {
 
     const ventas = Math.round(amount * 0.10 * 100) / 100
     const aporte = amount > 3260 ? Math.round((amount - 3260) * 0.05 * 100) / 100 : 0
-    const due = getMonthlyDueDateObj(mesNumero)
+    const due = dueDateForMonth(mesNumero)
     const moraVentas = calcSurcharge(ventas, due)?.amount || 0
     const moraAporte = calcSurcharge(aporte, due)?.amount || 0
     const principal = Math.round((ventas + aporte) * 100) / 100

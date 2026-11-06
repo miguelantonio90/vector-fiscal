@@ -506,6 +506,16 @@ function calcSurcharge(principal, dueDate) {
   return calculateLateFee(principal, dueDate)
 }
 
+function dueDateForMonth(mesNumero) {
+  const name = nombresMeses[mesNumero].toLowerCase()
+  const obl = obligaciones.value.find(o =>
+    o.tributeCode === '0114022' &&
+    o.dueDate &&
+    String(o.period || '').toLowerCase().startsWith(name + ':')
+  )
+  return obl?.dueDate || getMonthlyDueDateObj(mesNumero)
+}
+
 /** Cargos mensuales (0114022 + 0510122) + mora para un mes con ingreso */
 function cargosDelMes(mesNumero) {
   const ingreso = ingresos.value.find(ing => ing.month === mesNumero)
@@ -514,7 +524,7 @@ function cargosDelMes(mesNumero) {
 
   const ventas = Math.round(amount * 0.10 * 100) / 100
   const aporte = amount > 3260 ? Math.round((amount - 3260) * 0.05 * 100) / 100 : 0
-  const due = getMonthlyDueDateObj(mesNumero)
+  const due = dueDateForMonth(mesNumero)
   const moraVentas = calcSurcharge(ventas, due)?.amount || 0
   const moraAporte = calcSurcharge(aporte, due)?.amount || 0
   const principal = Math.round((ventas + aporte) * 100) / 100
@@ -595,13 +605,13 @@ const quarterlyDueDate = computed(() => {
 const surchargeVentas = computed(() => {
   if (!editingMes.value || !formIngreso.value || formIngreso.value <= 0) return null
   const principal = formIngreso.value * 0.10
-  return calcSurcharge(principal, getMonthlyDueDateObj(editingMes.value.numero))
+  return calcSurcharge(principal, dueDateForMonth(editingMes.value.numero))
 })
 
 const surchargeAporte = computed(() => {
   if (!editingMes.value || !formIngreso.value || formIngreso.value <= 3260) return null
   const principal = (formIngreso.value - 3260) * 0.05
-  return calcSurcharge(principal, getMonthlyDueDateObj(editingMes.value.numero))
+  return calcSurcharge(principal, dueDateForMonth(editingMes.value.numero))
 })
 
 const totalSurcharge = computed(() => {
