@@ -356,15 +356,15 @@
           </div>
           <div class="space-y-3 text-sm">
             <div class="flex justify-between items-center p-2 bg-slate-800/30 rounded-lg">
-              <span class="text-slate-300">Pago anticipado</span>
+              <span class="text-slate-300">DJ hasta el 28 de febrero</span>
               <span class="text-emerald-400 font-semibold">5%</span>
             </div>
             <div class="flex justify-between items-center p-2 bg-slate-800/30 rounded-lg">
-              <span class="text-slate-300">Transfermóvil</span>
+              <span class="text-slate-300">Transfermóvil o EnZona</span>
               <span class="text-blue-400 font-semibold">3%</span>
             </div>
             <div class="flex justify-between items-center p-2 bg-purple-500/10 rounded-lg border border-purple-500/20">
-              <span class="text-slate-300">Combinado</span>
+              <span class="text-slate-300">DJ por canal electrónico</span>
               <span class="text-purple-400 font-semibold">8%</span>
             </div>
           </div>
@@ -410,6 +410,7 @@ import { ref, onMounted, computed } from 'vue'
 import { usePageLoading } from '../composables/pageLoading'
 import { obligationsApi, paymentsApi, predictionsApi, incomesApi } from '../services/api'
 import InsightsPanel from '../components/InsightsPanel.vue'
+import { calculateLateFee } from '../utils/businessDays'
 
 const loading = usePageLoading('Dashboard')
 const allObligations = ref([])
@@ -483,38 +484,8 @@ function isEstimated(obligation) {
   return monthIncome <= 0 && getPrincipal(obligation) > 0
 }
 
-function countBusinessDays(from, to) {
-  let count = 0
-  const cursor = new Date(from)
-  cursor.setDate(cursor.getDate() + 1)
-  const end = new Date(to)
-  end.setHours(0, 0, 0, 0)
-  while (cursor <= end) {
-    const dow = cursor.getDay()
-    if (dow !== 0 && dow !== 6) count++
-    cursor.setDate(cursor.getDate() + 1)
-  }
-  return count
-}
-
-function calcLateSurcharge(principal, dueDate) {
-  if (!principal || !dueDate) return 0
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const due = new Date(dueDate)
-  due.setHours(0, 0, 0, 0)
-  if (today <= due) return 0
-  const lateDays = countBusinessDays(due, today)
-  if (lateDays <= 0) return 0
-  let rate
-  if (lateDays <= 30) rate = 0.02
-  else if (lateDays <= 60) rate = 0.05
-  else rate = Math.min(0.001 * lateDays, 0.40)
-  return Math.round(principal * rate * 100) / 100
-}
-
 function getMora(obligation) {
-  return calcLateSurcharge(getPrincipal(obligation), obligation.dueDate)
+  return calculateLateFee(getPrincipal(obligation), obligation.dueDate)?.amount || 0
 }
 
 function getObligationAmount(obligation) {

@@ -414,6 +414,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { usePageLoading } from '../composables/pageLoading'
 import { incomesApi, obligationsApi } from '../services/api'
+import { calculateLateFee } from '../utils/businessDays'
 
 const currentFiscalYear = new Date().getFullYear()
 const loading = usePageLoading('Incomes')
@@ -501,44 +502,8 @@ function formatDueDate(dateObj) {
   return `${day}/${nombresMesesCortos[m]}/${y.toString().slice(-2)}`
 }
 
-function countBusinessDays(from, to) {
-  let count = 0
-  const cursor = new Date(from)
-  cursor.setDate(cursor.getDate() + 1)
-  while (cursor <= to) {
-    const dow = cursor.getDay()
-    if (dow !== 0 && dow !== 6) count++
-    cursor.setDate(cursor.getDate() + 1)
-  }
-  return count
-}
-
 function calcSurcharge(principal, dueDate) {
-  if (!principal || principal <= 0) return null
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const due = new Date(dueDate)
-  due.setHours(0, 0, 0, 0)
-  if (today <= due) return null
-  const lateDays = countBusinessDays(due, today)
-  if (lateDays <= 0) return null
-  let rate, amount, desc
-  if (lateDays <= 30) {
-    rate = 0.02
-    amount = principal * rate
-    desc = `${lateDays} días hábiles de mora - 2% del principal`
-  } else if (lateDays <= 60) {
-    rate = 0.05
-    amount = principal * rate
-    desc = `${lateDays} días hábiles de mora - 5% del principal`
-  } else {
-    rate = 0.001 * lateDays
-    const maxRate = 0.40
-    rate = Math.min(rate, maxRate)
-    amount = principal * rate
-    desc = `${lateDays} días hábiles de mora - 0.1%/día (${(rate * 100).toFixed(1)}%, tope 40%)`
-  }
-  return { lateDays, rate, amount: Math.round(amount * 100) / 100, desc }
+  return calculateLateFee(principal, dueDate)
 }
 
 /** Cargos mensuales (0114022 + 0510122) + mora para un mes con ingreso */

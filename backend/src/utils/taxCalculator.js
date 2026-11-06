@@ -75,7 +75,7 @@ function calculateIncomeAdvance(grossIncome) {
     applies: true,
     amount,
     excess,
-    message: `3% sobre ${excess.toFixed(2)} CUP (exceso del mínimo exento)`
+    message: `5% sobre ${excess.toFixed(2)} CUP (exceso del mínimo exento)`
   };
 }
 
@@ -248,20 +248,43 @@ function estimateAnnualTaxes(monthlyIncomes) {
 // FUNCIONES DE BONIFICACIÓN
 // ============================================
 
+const { calendarParts } = require('./lateSurcharge');
+
+function isElectronicChannel(paymentMethod) {
+  return paymentMethod === 'transfermovil' || paymentMethod === 'enzona';
+}
+
+/**
+ * El 5% es de la declaración jurada (0530222) presentada y pagada
+ * en o antes del 28 de febrero del año siguiente al ejercicio.
+ */
+function qualifiesForDeclarationBonus(obligation, paymentDate) {
+  if (!obligation || obligation.tributeCode !== '0530222' || !paymentDate) return false;
+  const paid = calendarParts(paymentDate);
+  if (!paid) return false;
+  const fiscalYear = obligation.fiscalYear || (paid.y - 1);
+  const deadlineYear = fiscalYear + 1;
+  if (paid.y < deadlineYear) return true;
+  if (paid.y > deadlineYear) return false;
+  if (paid.m < 2) return true;
+  if (paid.m > 2) return false;
+  return paid.d <= 28;
+}
+
 /**
  * Calcula bonificaciones disponibles
  * @param {number} amount - Monto original a pagar
- * @param {boolean} isEarlyPayment - Si es pago anticipado (antes del vencimiento)
- * @param {boolean} useTransfermovil - Si usa Transfermóvil/EnZona
+ * @param {boolean} declarationEarly - 5% de la DJ pagada hasta el 28 de febrero
+ * @param {boolean} useTransfermovil - 3% de Transfermóvil o EnZona
  * @returns {Object} - Información de bonificaciones
  */
-function calculateBonus(amount, isEarlyPayment = false, useTransfermovil = false) {
+function calculateBonus(amount, declarationEarly = false, useTransfermovil = false) {
   let bonusPercent = 0;
   const bonuses = [];
   
-  if (isEarlyPayment) {
+  if (declarationEarly) {
     bonusPercent += 5;
-    bonuses.push({ type: 'Pago anticipado', percent: 5, amount: Math.round(amount * 0.05 * 100) / 100 });
+    bonuses.push({ type: 'DJ hasta el 28 de febrero', percent: 5, amount: Math.round(amount * 0.05 * 100) / 100 });
   }
   
   if (useTransfermovil) {
@@ -306,6 +329,8 @@ module.exports = {
   
   // Bonificaciones
   calculateBonus,
+  isElectronicChannel,
+  qualifiesForDeclarationBonus,
   getQuarterlyPayment,
   
   // Constantes

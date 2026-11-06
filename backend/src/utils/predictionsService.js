@@ -271,9 +271,9 @@ function estimateFutureTaxes(incomeHistory, monthsAhead = 3) {
   const estimates = incomePredictions.predictions.map(pred => {
     const taxes = taxCalculator.calculateMonthlyTaxes(pred.predictedAmount);
     const withBonus = taxCalculator.calculateBonus(
-      taxes.totalMonthlyTax, 
-      true,  // pago anticipado
-      true   // transfermóvil
+      taxes.totalMonthlyTax,
+      false,
+      true
     );
 
     return {
@@ -575,7 +575,7 @@ function generateDashboardInsights(userData) {
       message: `${next.description} vence en ${daysUntil} días`,
       detail: next.amount > 0 ? `Monto: $${next.amount.toLocaleString()}` : 'Monto por calcular',
       action: canGetBonus ? {
-        text: 'Pagar ahora y ahorrar 8%',
+        text: 'Pagar por Transfermóvil y ahorrar 3%',
         type: 'primary'
       } : null
     });
@@ -585,7 +585,7 @@ function generateDashboardInsights(userData) {
   const currentIncome = incomes.find(i => i.month === currentMonth && i.year === currentYear);
   if (currentIncome) {
     const taxes = taxCalculator.calculateMonthlyTaxes(currentIncome.amount);
-    const withBonus = taxCalculator.calculateBonus(taxes.totalMonthlyTax, true, true);
+    const withBonus = taxCalculator.calculateBonus(taxes.totalMonthlyTax, false, true);
 
     insights.push({
       id: 'monthly-estimate',

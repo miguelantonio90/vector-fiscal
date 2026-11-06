@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { Alert, Obligation, Income, User } = require('../models');
 const { buildAmountSuffix, calculateLateSurcharge, resolvePrincipal } = require('../utils/lateSurcharge');
 
@@ -108,10 +109,13 @@ exports.generateAlerts = async (req, res) => {
         });
         
         if (!existingBonusAlert) {
+          const message = obligation.tributeCode === '0530222'
+            ? `Si presentas y pagas la Declaración Jurada (${obligation.period}) en o antes del 28 de febrero obtienes 5%. Por Transfermóvil o EnZona se suma otro 3%${amountSuffix}`
+            : `Si pagas ${obligation.description} (${obligation.period}) por Transfermóvil o EnZona obtienes 3% de descuento${amountSuffix}`;
           const alert = new Alert({
             obligation: obligation._id,
             type: 'bonificacion_disponible',
-            message: `Paga ${obligation.description} (${obligation.period}) antes del ${formatDate(dueDate)} y obtén 5% de bonificación${amountSuffix}`,
+            message,
             daysBefore: daysUntilDue
           });
           await alert.save();
@@ -423,22 +427,40 @@ function cubaClock(date = new Date()) {
   };
 }
 
+const ReminderLog = mongoose.models.ReminderLog || mongoose.model('ReminderLog', new mongoose.Schema({
+  day: { type: String, required: true, unique: true },
+  sentAt: { type: Date, default: Date.now }
+}));
+
 function startReminderScheduler() {
   const tick = async () => {
     const { day, hm } = cubaClock();
-    if (!REMINDER_SLOTS.includes(hm)) return;
-    const key = `${day} ${hm}`;
-    if (sentSlots.has(key)) return;
-    sentSlots.add(key);
+    if (hm < REMINDER_SLOTS[0]) return;
+    if (sentSlots.has(day)) return;
+
+    try {
+      await ReminderLog.create({ day });
+    } catch (err) {
+      if (err.code === 11000) {
+        sentSlots.add(day);
+        return;
+      }
+      console.error('[telegram] recordatorio:', err.message);
+      return;
+    }
+
+    sentSlots.add(day);
     try {
       const result = await runTelegramReminders();
-      console.log('[telegram] recordatorio', key, result);
+      console.log('[telegram] recordatorio', day, result);
     } catch (err) {
-      sentSlots.delete(key);
+      sentSlots.delete(day);
+      await ReminderLog.deleteOne({ day }).catch(() => {});
       console.error('[telegram] recordatorio:', err.message);
     }
   };
   setInterval(tick, 30 * 1000);
+  tick();
 }
 
 exports.startReminderScheduler = startReminderScheduler;

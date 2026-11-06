@@ -1,5 +1,13 @@
 const { Payment, Obligation } = require('../models');
 const { calculateLateSurcharge } = require('../utils/lateSurcharge');
+const { isElectronicChannel, qualifiesForDeclarationBonus } = require('../utils/taxCalculator');
+
+function bonusFromRules(obligation, paymentDate, paymentMethod) {
+  let bonusApplied = 0;
+  if (isElectronicChannel(paymentMethod)) bonusApplied += 3;
+  if (qualifiesForDeclarationBonus(obligation, paymentDate)) bonusApplied += 5;
+  return bonusApplied;
+}
 
 function parseConfirmationImage(input) {
   if (!input || typeof input !== 'string') return null;
@@ -118,12 +126,7 @@ exports.create = async (req, res) => {
         bonusApplied = (bonusAmount / principal) * 100;
       }
     } else if (bonusMode === 'calculate') {
-      if (paymentMethod === 'transfermovil') {
-        bonusApplied += 3;
-      }
-      if (pDate < new Date(obligation.dueDate)) {
-        bonusApplied += 5;
-      }
+      bonusApplied = bonusFromRules(obligation, pDate, paymentMethod);
       bonusAmount = (principal * bonusApplied) / 100;
     }
 
@@ -203,13 +206,8 @@ exports.update = async (req, res) => {
         bonusApplied = (bonusAmount / amount) * 100;
       }
     } else if (bonusMode === 'calculate') {
-      if (paymentMethod === 'transfermovil') {
-        bonusApplied += 3;
-      }
-      const pDate = new Date(paymentDate || Date.now());
-      if (obligation && pDate < new Date(obligation.dueDate)) {
-        bonusApplied += 5;
-      }
+      const when = new Date(paymentDate || Date.now());
+      bonusApplied = bonusFromRules(obligation, when, paymentMethod);
       bonusAmount = (amount * bonusApplied) / 100;
     }
     

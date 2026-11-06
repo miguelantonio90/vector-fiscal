@@ -184,11 +184,11 @@ const calculateEstimate = async (req, res) => {
     };
 
     if (includeBonus) {
-      const withBonus = taxCalculator.calculateBonus(taxes.totalMonthlyTax, true, true);
+      const withBonus = taxCalculator.calculateBonus(taxes.totalMonthlyTax, false, true);
       result.withBonus = {
-        earlyPayment: taxCalculator.calculateBonus(taxes.totalMonthlyTax, true, false),
-        transfermovil: taxCalculator.calculateBonus(taxes.totalMonthlyTax, false, true),
-        combined: withBonus
+        declaration: taxCalculator.calculateBonus(taxes.totalMonthlyTax, true, false),
+        transfermovil: withBonus,
+        combined: taxCalculator.calculateBonus(taxes.totalMonthlyTax, true, true)
       };
     }
 

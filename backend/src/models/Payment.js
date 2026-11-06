@@ -27,7 +27,7 @@ const paymentSchema = new mongoose.Schema({
   // Método de pago
   paymentMethod: {
     type: String,
-    enum: ['efectivo', 'transfermovil', 'banco', 'otro'],
+    enum: ['efectivo', 'transfermovil', 'enzona', 'banco', 'otro'],
     default: 'efectivo'
   },
   // Bonificación aplicada (%)

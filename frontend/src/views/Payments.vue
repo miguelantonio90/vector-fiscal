@@ -100,6 +100,7 @@
             <option value="">Todo método</option>
             <option value="efectivo">Efectivo</option>
             <option value="transfermovil">Transfermóvil</option>
+            <option value="enzona">EnZona</option>
             <option value="banco">Banco</option>
           </select>
           <select v-model="sortBy" class="input w-40 text-sm py-2">
@@ -428,6 +429,7 @@
               <select v-model="paymentForm.paymentMethod" class="input" required>
                 <option value="efectivo">Efectivo</option>
                 <option value="transfermovil">Transfermóvil</option>
+                <option value="enzona">EnZona</option>
                 <option value="banco">Banco</option>
                 <option value="otro">Otro</option>
               </select>
@@ -533,8 +535,8 @@
             <div v-else-if="paymentForm.bonusMode === 'calculate'" class="space-y-2">
               <p class="text-xs text-slate-400">El sistema calculará automáticamente las bonificaciones:</p>
               <div class="flex gap-4 text-xs text-slate-500">
-                <span v-if="paymentForm.paymentMethod === 'transfermovil'" class="text-blue-400">+3% Transfermóvil</span>
-                <span v-if="isEarlyPayment" class="text-emerald-400">+5% Anticipado</span>
+                <span v-if="isElectronicPayment" class="text-blue-400">+3% canal electrónico</span>
+                <span v-if="isDeclarationBonus" class="text-emerald-400">+5% DJ hasta el 28 de febrero</span>
               </div>
             </div>
 
@@ -574,15 +576,15 @@
           <div v-if="selectedObligation && paymentForm.amount && !surchargePreview && !paymentForm.bonusAlreadyApplied" class="p-4 bg-emerald-900/20 rounded-xl border border-emerald-700/30">
             <p class="text-sm text-emerald-400 font-medium mb-2">Bonificaciones que se aplicarán:</p>
             <div class="flex justify-between text-sm">
-              <span class="text-slate-300">Pago anticipado (5%)</span>
-              <span :class="isEarlyPayment ? 'text-emerald-400' : 'text-slate-500'">
-                {{ isEarlyPayment ? 'Aplicable' : 'No aplicable' }}
+              <span class="text-slate-300">DJ hasta el 28 de febrero (5%)</span>
+              <span :class="isDeclarationBonus ? 'text-emerald-400' : 'text-slate-500'">
+                {{ isDeclarationBonus ? 'Aplicable' : 'No aplicable' }}
               </span>
             </div>
             <div class="flex justify-between text-sm mt-1">
-              <span class="text-slate-300">Transfermóvil (3%)</span>
-              <span :class="paymentForm.paymentMethod === 'transfermovil' ? 'text-emerald-400' : 'text-slate-500'">
-                {{ paymentForm.paymentMethod === 'transfermovil' ? 'Aplicable' : 'No aplicable' }}
+              <span class="text-slate-300">Transfermóvil o EnZona (3%)</span>
+              <span :class="isElectronicPayment ? 'text-emerald-400' : 'text-slate-500'">
+                {{ isElectronicPayment ? 'Aplicable' : 'No aplicable' }}
               </span>
             </div>
           </div>
@@ -951,11 +953,22 @@ watch(() => paymentForm.value.obligationId, async (oblId) => {
   }
 })
 
-const isEarlyPayment = computed(() => {
-  if (!selectedObligation.value || !paymentForm.value.paymentDate) return false
-  const payDate = new Date(paymentForm.value.paymentDate)
-  const dueDate = new Date(selectedObligation.value.dueDate)
-  return payDate < dueDate
+const isElectronicPayment = computed(() =>
+  paymentForm.value.paymentMethod === 'transfermovil' || paymentForm.value.paymentMethod === 'enzona'
+)
+
+const isDeclarationBonus = computed(() => {
+  const obl = selectedObligation.value
+  const raw = paymentForm.value.paymentDate
+  if (!obl || obl.tributeCode !== '0530222' || !raw) return false
+  const [y, m, d] = raw.split('-').map(Number)
+  if (!y || !m || !d) return false
+  const deadlineYear = (obl.fiscalYear || y - 1) + 1
+  if (y < deadlineYear) return true
+  if (y > deadlineYear) return false
+  if (m < 2) return true
+  if (m > 2) return false
+  return d <= 28
 })
 
 const isLatePayment = computed(() => {
@@ -1150,6 +1163,7 @@ function getMethodLabel(method) {
   const labels = {
     efectivo: 'Efectivo',
     transfermovil: 'Transfermóvil',
+    enzona: 'EnZona',
     banco: 'Banco',
     otro: 'Otro'
   }
@@ -1160,6 +1174,7 @@ function getMethodClass(method) {
   const classes = {
     efectivo: 'bg-slate-600/50 text-slate-200',
     transfermovil: 'bg-blue-600/30 text-blue-300 border border-blue-500/30',
+    enzona: 'bg-cyan-600/30 text-cyan-300 border border-cyan-500/30',
     banco: 'bg-purple-600/30 text-purple-300 border border-purple-500/30',
     otro: 'bg-slate-600/50 text-slate-200'
   }

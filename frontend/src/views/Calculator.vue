@@ -56,7 +56,7 @@
                 @change="calculate"
               />
               <span class="text-slate-300 group-hover:text-white transition-colors">
-                Pago anticipado (antes del vencimiento)
+                Declaración jurada pagada hasta el 28 de febrero
                 <span class="text-emerald-400 font-semibold ml-2">-5%</span>
               </span>
             </label>
@@ -69,10 +69,11 @@
                 @change="calculate"
               />
               <span class="text-slate-300 group-hover:text-white transition-colors">
-                Pago por Transfermóvil/EnZona
+                Pago por Transfermóvil o EnZona
                 <span class="text-emerald-400 font-semibold ml-2">-3%</span>
               </span>
             </label>
+            <p class="text-xs text-slate-500">El 5% no aplica al pago mensual. El 3% sí, si pagas por canal electrónico.</p>
           </div>
 
           <!-- Calculate Button -->
@@ -148,7 +149,7 @@
                 <span class="text-slate-300 font-mono">{{ formatCurrency(result.taxes.incomeAdvance.excess) }}</span>
               </div>
               <div class="flex justify-between items-center">
-                <span class="text-slate-400 text-sm">3% sobre el exceso</span>
+                <span class="text-slate-400 text-sm">5% sobre el exceso</span>
                 <span class="text-orange-400 font-mono font-bold text-lg">{{ formatCurrency(result.taxes.incomeAdvance.amount) }}</span>
               </div>
             </div>
@@ -217,7 +218,7 @@
               <span class="text-white font-medium">Aporte a cuenta Imp. Ingresos Personales</span>
             </div>
             <p class="text-slate-400 text-sm">
-              <strong class="text-orange-400">3%</strong> sobre ingresos que excedan 
+              <strong class="text-orange-400">5%</strong> sobre ingresos que excedan 
               <strong class="text-emerald-400">{{ formatCurrency(3260) }}</strong> mensuales (mínimo exento).
               Solo aplica si superas este monto.
             </p>
@@ -281,7 +282,7 @@ import { ref, onMounted } from 'vue'
 import { calculatorApi } from '../services/api'
 
 const grossIncome = ref(null)
-const isEarlyPayment = ref(true) // Por defecto marcado ya que usualmente paga anticipado
+const isEarlyPayment = ref(false)
 const useTransfermovil = ref(true) // Por defecto marcado ya que usa Transfermóvil
 const calculating = ref(false)
 const result = ref(null)

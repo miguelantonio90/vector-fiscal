@@ -100,9 +100,9 @@ router.get('/rates', (req, res) => {
       description: 'Escala progresiva según Ley 174/2025'
     },
     bonuses: {
-      earlyPayment: { percent: 5, description: 'Pago antes del vencimiento' },
-      transfermovil: { percent: 3, description: 'Pago por Transfermóvil/EnZona' },
-      combined: { percent: 8, description: 'Ambas bonificaciones combinadas' }
+      declaration: { percent: 5, description: 'Declaración jurada presentada y pagada en o antes del 28 de febrero' },
+      transfermovil: { percent: 3, description: 'Pago por Transfermóvil o EnZona' },
+      combined: { percent: 8, description: 'DJ hasta el 28 de febrero pagada por canal electrónico' }
     }
   });
 });

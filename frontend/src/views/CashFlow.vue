@@ -359,7 +359,7 @@
               <p class="font-mono font-semibold text-white">{{ formatCurrency(est.estimatedTax.total) }}</p>
             </div>
             <div class="flex items-center justify-between text-xs">
-              <span class="text-slate-400">Con bonificación máxima (8%)</span>
+              <span class="text-slate-400">Con Transfermóvil (3%)</span>
               <span class="text-emerald-400 font-mono">{{ formatCurrency(est.withMaxBonus.amount) }}</span>
             </div>
             <div class="flex items-center justify-between text-xs mt-1">

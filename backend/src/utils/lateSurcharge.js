@@ -1,4 +1,57 @@
 /**
+ * Fecha de calendario que hay que usar para un vencimiento o un pago.
+ * Una fecha guardada a medianoche UTC (el "20/Feb/26" del vector) conserva ese día.
+ * Un instante con hora se lee en el calendario de Cuba.
+ */
+function calendarParts(value) {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value) && value.length <= 10) {
+    const [y, m, d] = value.slice(0, 10).split('-').map(Number);
+    return { y, m, d };
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const midnightUtc = date.getUTCHours() === 0
+    && date.getUTCMinutes() === 0
+    && date.getUTCSeconds() === 0
+    && date.getUTCMilliseconds() === 0;
+  if (midnightUtc) {
+    return { y: date.getUTCFullYear(), m: date.getUTCMonth() + 1, d: date.getUTCDate() };
+  }
+
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'America/Havana',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+  const get = (type) => Number(parts.find((p) => p.type === type).value);
+  return { y: get('year'), m: get('month'), d: get('day') };
+}
+
+/**
+ * Días hábiles de mora: el día siguiente al vencimiento hasta el día del pago, inclusive.
+ * No usa la zona del servidor: el cambio de hora de noviembre no suma un día de más.
+ */
+function countBusinessDays(dueDate, paymentDate = new Date()) {
+  const due = calendarParts(dueDate);
+  const paid = calendarParts(paymentDate);
+  if (!due || !paid) return 0;
+
+  const start = Date.UTC(due.y, due.m - 1, due.d);
+  const end = Date.UTC(paid.y, paid.m - 1, paid.d);
+  if (end <= start) return 0;
+
+  let count = 0;
+  for (let t = start + 86400000; t <= end; t += 86400000) {
+    const dow = new Date(t).getUTCDay();
+    if (dow !== 0 && dow !== 6) count++;
+  }
+  return count;
+}
+
+/**
  * Calcula el recargo por mora según las reglas ONAT (código tributo 1060122):
  *   - Hasta 30 días hábiles: 2% del principal
  *   - Más de 30 y hasta 60 días hábiles: 5% del principal
@@ -7,24 +60,7 @@
 function calculateLateSurcharge(principal, dueDate, paymentDate = new Date()) {
   if (!principal || principal <= 0 || !dueDate) return null;
 
-  const due = new Date(dueDate);
-  const paid = new Date(paymentDate);
-  due.setHours(0, 0, 0, 0);
-  paid.setHours(0, 0, 0, 0);
-
-  if (paid <= due) return null;
-
-  const msPerDay = 86400000;
-  const calendarDays = Math.floor((paid - due) / msPerDay);
-
-  let businessDays = 0;
-  const d = new Date(due);
-  for (let i = 0; i < calendarDays; i++) {
-    d.setDate(d.getDate() + 1);
-    const dow = d.getDay();
-    if (dow !== 0 && dow !== 6) businessDays++;
-  }
-
+  const businessDays = countBusinessDays(dueDate, paymentDate);
   if (businessDays <= 0) return null;
 
   let surchargeRate;
@@ -45,7 +81,7 @@ function calculateLateSurcharge(principal, dueDate, paymentDate = new Date()) {
 
   return {
     lateDays: businessDays,
-    calendarDays,
+    calendarDays: businessDays,
     surchargeRate,
     surchargeAmount,
     description
@@ -106,6 +142,8 @@ function buildAmountSuffix(obligation, incomeByMonth = {}, asOfDate = new Date()
 }
 
 module.exports = {
+  calendarParts,
+  countBusinessDays,
   calculateLateSurcharge,
   getMonthFromPeriod,
   resolvePrincipal,
