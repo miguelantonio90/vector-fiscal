@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { Alert, Obligation, Income, User } = require('../models');
 const { buildAmountSuffix, calculateLateSurcharge, resolvePrincipal } = require('../utils/lateSurcharge');
 
@@ -404,4 +405,64 @@ exports.telegramRemind = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Un aviso al día, desde las 9:00 hora de Cuba. Si el proceso estaba dormido,
+// sale en el primer despertar de ese día.
+const REMINDER_HOUR = '09:00';
+const sentDays = new Set();
+
+function cubaClock(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'America/Havana',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23'
+  }).formatToParts(date);
+  const get = (type) => parts.find((p) => p.type === type).value;
+  return {
+    day: `${get('year')}-${get('month')}-${get('day')}`,
+    hm: `${get('hour')}:${get('minute')}`
+  };
+}
+
+const ReminderLog = mongoose.models.ReminderLog || mongoose.model('ReminderLog', new mongoose.Schema({
+  day: { type: String, required: true, unique: true },
+  sentAt: { type: Date, default: Date.now }
+}));
+
+function startReminderScheduler() {
+  const tick = async () => {
+    const { day, hm } = cubaClock();
+    if (hm < REMINDER_HOUR) return;
+    if (sentDays.has(day)) return;
+
+    try {
+      await ReminderLog.create({ day });
+    } catch (err) {
+      if (err.code === 11000) {
+        sentDays.add(day);
+        return;
+      }
+      console.error('[telegram] recordatorio:', err.message);
+      return;
+    }
+
+    sentDays.add(day);
+    try {
+      const result = await runTelegramReminders();
+      console.log('[telegram] recordatorio', day, result);
+    } catch (err) {
+      sentDays.delete(day);
+      await ReminderLog.deleteOne({ day }).catch(() => {});
+      console.error('[telegram] recordatorio:', err.message);
+    }
+  };
+  setInterval(tick, 30 * 1000);
+  tick();
+}
+
+exports.startReminderScheduler = startReminderScheduler;
 
