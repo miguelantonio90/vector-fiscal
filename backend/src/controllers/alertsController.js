@@ -1,5 +1,12 @@
 const { Alert, Obligation, Income, User } = require('../models');
-const { buildAmountSuffix, calculateLateSurcharge } = require('../utils/lateSurcharge');
+const { buildAmountSuffix, calculateLateSurcharge, resolvePrincipal } = require('../utils/lateSurcharge');
+
+const TRIBUTE_NAMES = {
+  '0114022': 'Ventas y servicios',
+  '0510122': 'Aporte ingresos personales (5% sobre el excedente de $3,260)',
+  '0820132': 'Seguridad social',
+  '0530222': 'Contribución territorial'
+};
 
 // Obtener todas las alertas del usuario
 exports.getAll = async (req, res) => {
@@ -255,11 +262,21 @@ async function runTelegramReminders() {
 
   for (const user of users) {
     try {
-      const obligations = await Obligation.find({
-        user: user._id,
-        status: { $nin: ['pagado', 'paid'] },
-        dueDate: { $exists: true, $ne: null }
-      }).sort({ dueDate: 1 });
+      const [obligations, incomes] = await Promise.all([
+        Obligation.find({
+          user: user._id,
+          status: { $nin: ['pagado', 'paid'] },
+          dueDate: { $exists: true, $ne: null }
+        }).sort({ dueDate: 1 }),
+        Income.find({ user: user._id })
+      ]);
+
+      const incomeByYear = {};
+      for (const inc of incomes) {
+        const y = inc.year;
+        if (!incomeByYear[y]) incomeByYear[y] = {};
+        incomeByYear[y][inc.month] = inc.grossIncome || inc.amount || 0;
+      }
 
         const lines = [];
         for (const obl of obligations) {
@@ -267,21 +284,26 @@ async function runTelegramReminders() {
           const overdue = days < 0;
           if (!overdue && !remindDays.has(days)) continue;
 
-          const principal = Number(obl.amount) || 0;
+          const principal = resolvePrincipal(obl, incomeByYear[obl.fiscalYear] || {});
+          if (!principal) continue;
+
           const surcharge = calculateLateSurcharge(principal, obl.dueDate, today);
           const mora = surcharge?.surchargeAmount || 0;
-          const total = principal + mora;
+          const total = Math.round((principal + mora) * 100) / 100;
           const when = overdue
             ? `VENCIDA hace ${Math.abs(days)} día(s)`
             : days === 1
               ? 'vence mañana'
               : `vence en ${days} días`;
+          const name = TRIBUTE_NAMES[obl.tributeCode] || obl.description || '';
 
           lines.push(
-            `• <b>${obl.tributeCode || ''}</b> ${obl.period || ''}\n` +
+            `• <b>${obl.tributeCode || ''}</b> ${name}\n` +
+            `  ${obl.period || ''}\n` +
             `  ${when} (${formatDate(obl.dueDate)})\n` +
-            `  Total: $${formatMoney(total)}` +
-            (mora > 0 ? ` (mora $${formatMoney(mora)})` : '')
+            `  Principal: $${formatMoney(principal)}` +
+            (mora > 0 ? `\n  Mora: $${formatMoney(mora)}` : '') +
+            `\n  Total: $${formatMoney(total)}`
           );
         }
 
