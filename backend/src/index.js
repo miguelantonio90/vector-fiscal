@@ -95,7 +95,6 @@ app.listen(PORT, '0.0.0.0', () => {
     }).catch((err) => {
       console.warn('[telegram] No se pudo registrar webhook:', err.message);
     });
-    require('./controllers/alertsController').startReminderScheduler();
   } else if (process.env.TELEGRAM_POLLING === '1') {
     telegram.startPolling();
   }
