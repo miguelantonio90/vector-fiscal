@@ -9,15 +9,64 @@
           </h2>
           <p class="text-slate-400">Control de tus ingresos mensuales para cálculo de impuestos</p>
         </div>
-        <div class="flex items-center gap-4">
+        <div class="flex items-center gap-6">
           <div class="text-right">
-            <p class="text-slate-400 text-sm">Total Anual</p>
+            <p class="text-slate-400 text-sm">Total ingresos</p>
             <p class="text-2xl font-display font-bold text-blue-400">{{ formatCurrency(totalAnual) }}</p>
           </div>
           <div class="text-right">
-            <p class="text-slate-400 text-sm">Promedio Mensual</p>
+            <p class="text-slate-400 text-sm">Total a depositar</p>
+            <p class="text-2xl font-display font-bold text-onat-red">{{ formatCurrency(totalADepositar) }}</p>
+          </div>
+          <div class="text-right hidden sm:block">
+            <p class="text-slate-400 text-sm">Promedio mensual</p>
             <p class="text-xl font-display font-bold text-white">{{ formatCurrency(promedioMensual) }}</p>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Deposit breakdown -->
+    <div class="card border border-red-700/30 bg-gradient-to-br from-red-900/20 to-slate-800/50">
+      <h3 class="text-lg font-display font-bold text-white mb-4">Resumen a depositar</h3>
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div>
+          <p class="text-slate-400 text-sm">Impuestos mensuales</p>
+          <p class="text-xl font-bold text-amber-400 font-mono">{{ formatCurrency(totalMensualesPrincipal) }}</p>
+          <p class="text-xs text-slate-500">0114022 + 0510122</p>
+        </div>
+        <div>
+          <p class="text-slate-400 text-sm">Seguridad social</p>
+          <p class="text-xl font-bold text-blue-400 font-mono">{{ formatCurrency(totalTrimestralPrincipal) }}</p>
+          <p class="text-xs text-slate-500">0820132 · {{ trimestralesPendientes.length }} trimestre(s)</p>
+        </div>
+        <div>
+          <p class="text-slate-400 text-sm">Mora acumulada</p>
+          <p class="text-xl font-bold text-red-400 font-mono">{{ formatCurrency(totalMora) }}</p>
+          <p class="text-xs text-slate-500">Recargo 1060122</p>
+        </div>
+        <div>
+          <p class="text-slate-400 text-sm">TOTAL A DEPOSITAR</p>
+          <p class="text-2xl font-bold text-onat-red font-mono">{{ formatCurrency(totalADepositar) }}</p>
+          <p class="text-xs text-slate-500">Principal + mora</p>
+        </div>
+      </div>
+
+      <div v-if="trimestralesPendientes.length" class="mt-4 pt-4 border-t border-slate-700/50 space-y-2">
+        <p class="text-sm font-medium text-slate-300 mb-2">Trimestrales pendientes (0820132)</p>
+        <div
+          v-for="t in trimestralesPendientes"
+          :key="t._id"
+          class="flex items-center justify-between text-sm py-1.5 px-3 rounded-lg bg-slate-900/40"
+        >
+          <div>
+            <p class="text-slate-300">{{ t.period }}</p>
+            <p v-if="t.mora > 0" class="text-xs text-red-400">{{ formatCurrency(t.principal) }} + mora {{ formatCurrency(t.mora) }}</p>
+            <p v-else class="text-xs text-slate-500">Sin mora</p>
+          </div>
+          <span class="font-mono font-bold" :class="t.mora > 0 ? 'text-red-400' : 'text-blue-400'">
+            {{ formatCurrency(t.total) }}
+          </span>
         </div>
       </div>
     </div>
@@ -90,11 +139,21 @@
             <div class="space-y-1 text-xs">
               <div class="flex justify-between text-slate-400">
                 <span>0114022 (10%)</span>
-                <span class="text-amber-400">{{ formatCurrency(mes.ingreso.amount * 0.10) }}</span>
+                <span class="text-amber-400">{{ formatCurrency(cargosDelMes(mes.numero).ventas) }}</span>
               </div>
-              <div v-if="mes.ingreso.amount > 3260" class="flex justify-between text-slate-400">
+              <div v-if="cargosDelMes(mes.numero).aporte > 0" class="flex justify-between text-slate-400">
                 <span>0510122 (5%)</span>
-                <span class="text-orange-400">{{ formatCurrency((mes.ingreso.amount - 3260) * 0.05) }}</span>
+                <span class="text-orange-400">{{ formatCurrency(cargosDelMes(mes.numero).aporte) }}</span>
+              </div>
+              <div v-if="cargosDelMes(mes.numero).mora > 0" class="flex justify-between text-red-400">
+                <span>+ Mora</span>
+                <span class="font-mono">{{ formatCurrency(cargosDelMes(mes.numero).mora) }}</span>
+              </div>
+              <div class="flex justify-between pt-1 border-t border-slate-700/50 font-medium">
+                <span class="text-slate-300">A pagar</span>
+                <span class="font-mono" :class="cargosDelMes(mes.numero).mora > 0 ? 'text-red-400' : 'text-onat-red'">
+                  {{ formatCurrency(cargosDelMes(mes.numero).total) }}
+                </span>
               </div>
             </div>
           </div>
@@ -353,18 +412,20 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { incomesApi } from '../services/api'
+import { incomesApi, obligationsApi } from '../services/api'
 
 const currentFiscalYear = new Date().getFullYear()
 const loading = ref(true)
 const saving = ref(false)
 const ingresos = ref([])
+const obligaciones = ref([])
 const showModal = ref(false)
 const editingMes = ref(null)
 const formIngreso = ref(null)
 const formNotas = ref('')
 
 const nombresMeses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+const nombresMesesCortos = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
 const mesesDelAno = computed(() => {
   return Array.from({ length: 12 }, (_, i) => {
@@ -411,8 +472,6 @@ const mesMinimo = computed(() => {
   return { amount: min.amount, nombre: nombresMeses[min.month] }
 })
 
-const nombresMesesCortos = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-
 function getAdjustedDueDay(year, monthIndex) {
   const d = new Date(year, monthIndex, 20)
   const dow = d.getDay()
@@ -454,6 +513,7 @@ function countBusinessDays(from, to) {
 }
 
 function calcSurcharge(principal, dueDate) {
+  if (!principal || principal <= 0) return null
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const due = new Date(dueDate)
@@ -479,6 +539,82 @@ function calcSurcharge(principal, dueDate) {
   }
   return { lateDays, rate, amount: Math.round(amount * 100) / 100, desc }
 }
+
+/** Cargos mensuales (0114022 + 0510122) + mora para un mes con ingreso */
+function cargosDelMes(mesNumero) {
+  const ingreso = ingresos.value.find(ing => ing.month === mesNumero)
+  const amount = ingreso?.amount || ingreso?.grossIncome || 0
+  if (!amount) return { ventas: 0, aporte: 0, principal: 0, mora: 0, total: 0 }
+
+  const ventas = Math.round(amount * 0.10 * 100) / 100
+  const aporte = amount > 3260 ? Math.round((amount - 3260) * 0.05 * 100) / 100 : 0
+  const due = getMonthlyDueDateObj(mesNumero)
+  const moraVentas = calcSurcharge(ventas, due)?.amount || 0
+  const moraAporte = calcSurcharge(aporte, due)?.amount || 0
+  const principal = Math.round((ventas + aporte) * 100) / 100
+  const mora = Math.round((moraVentas + moraAporte) * 100) / 100
+  return {
+    ventas,
+    aporte,
+    principal,
+    mora,
+    total: Math.round((principal + mora) * 100) / 100
+  }
+}
+
+const trimestralesPendientes = computed(() => {
+  return obligaciones.value
+    .filter(o =>
+      o.tributeCode === '0820132' &&
+      o.status !== 'pagado'
+    )
+    .map(o => {
+      const principal = o.amount > 0 ? o.amount : 1200
+      const due = o.dueDate ? new Date(o.dueDate) : getQuarterlyDueDateObj(3)
+      const mora = calcSurcharge(principal, due)?.amount || 0
+      return {
+        _id: o._id,
+        period: o.period || 'Trimestre',
+        principal,
+        mora,
+        total: Math.round((principal + mora) * 100) / 100,
+        dueDate: due
+      }
+    })
+    .sort((a, b) => a.dueDate - b.dueDate)
+})
+
+const totalMensualesPrincipal = computed(() => {
+  return ingresos.value.reduce((sum, ing) => {
+    return sum + cargosDelMes(ing.month).principal
+  }, 0)
+})
+
+const totalMensualesMora = computed(() => {
+  return ingresos.value.reduce((sum, ing) => {
+    return sum + cargosDelMes(ing.month).mora
+  }, 0)
+})
+
+const totalTrimestralPrincipal = computed(() => {
+  return trimestralesPendientes.value.reduce((sum, t) => sum + t.principal, 0)
+})
+
+const totalTrimestralMora = computed(() => {
+  return trimestralesPendientes.value.reduce((sum, t) => sum + t.mora, 0)
+})
+
+const totalMora = computed(() => {
+  return Math.round((totalMensualesMora.value + totalTrimestralMora.value) * 100) / 100
+})
+
+const totalADepositar = computed(() => {
+  return Math.round((
+    totalMensualesPrincipal.value +
+    totalTrimestralPrincipal.value +
+    totalMora.value
+  ) * 100) / 100
+})
 
 const monthlyDueDate = computed(() => {
   if (!editingMes.value) return ''
@@ -527,14 +663,13 @@ function getMonthClass(mes) {
 
 function getBarHeight(amount) {
   if (!amount) return 10
-  const maxHeight = 200 // pixels
-  const max = Math.max(...ingresos.value.map(i => i.amount || 0), 3500) // Al menos 3500 para que se vea la línea del mínimo
+  const maxHeight = 200
+  const max = Math.max(...ingresos.value.map(i => i.amount || 0), 3500)
   return Math.max(10, (amount / max) * maxHeight)
 }
 
 function editarMes(mes) {
   editingMes.value = mes
-  // Usar amount (que ya fue mapeado de grossIncome) o grossIncome directamente
   formIngreso.value = mes.ingreso?.amount || mes.ingreso?.grossIncome || null
   formNotas.value = mes.ingreso?.notes || ''
   showModal.value = true
@@ -585,12 +720,15 @@ async function eliminarIngreso() {
 async function loadData() {
   loading.value = true
   try {
-    const res = await incomesApi.getAll({ year: currentFiscalYear })
-    // Mapear grossIncome a amount para compatibilidad con el resto del código
-    ingresos.value = res.data.map(ing => ({
+    const [incomesRes, obligationsRes] = await Promise.all([
+      incomesApi.getAll({ year: currentFiscalYear }),
+      obligationsApi.getAll({ year: currentFiscalYear })
+    ])
+    ingresos.value = (incomesRes.data || []).map(ing => ({
       ...ing,
       amount: ing.grossIncome || ing.amount || 0
     }))
+    obligaciones.value = obligationsRes.data || []
   } catch (error) {
     console.error('Error loading incomes:', error)
   } finally {
