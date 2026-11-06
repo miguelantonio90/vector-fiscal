@@ -113,12 +113,21 @@ const getCashFlow = async (req, res) => {
 const getDashboardInsights = async (req, res) => {
   try {
     const userId = req.user._id;
+    const year = Number(new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'America/Havana',
+      year: 'numeric'
+    }).format(new Date()));
 
-    // Obtener todos los datos del usuario
     const [incomes, obligations, payments] = await Promise.all([
-      Income.find({ user: userId }),
-      Obligation.find({ user: userId }),
-      Payment.find({ user: userId })
+      Income.find({ user: userId, year }),
+      Obligation.find({ user: userId, fiscalYear: year }),
+      Payment.find({
+        user: userId,
+        paymentDate: {
+          $gte: new Date(year, 0, 1),
+          $lt: new Date(year + 1, 0, 1)
+        }
+      })
     ]);
 
     // Normalizar ingresos para que tengan el campo amount

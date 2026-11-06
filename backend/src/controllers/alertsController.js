@@ -12,7 +12,10 @@ const TRIBUTE_NAMES = {
 exports.getAll = async (req, res) => {
   try {
     const { isRead } = req.query;
-    const userObligations = await Obligation.find({ user: req.user._id }).select('_id');
+    const userObligations = await Obligation.find({
+      user: req.user._id,
+      fiscalYear: currentFiscalYear()
+    }).select('_id');
     const obligationIds = userObligations.map(o => o._id);
 
     const filter = { obligation: { $in: obligationIds } };
@@ -33,10 +36,11 @@ exports.generateAlerts = async (req, res) => {
   try {
     const today = new Date();
     const alerts = [];
-    const year = today.getFullYear();
+    const year = currentFiscalYear(today);
 
     const pendingObligations = await Obligation.find({
       user: req.user._id,
+      fiscalYear: year,
       status: { $in: ['pendiente', 'vencido'] }
     });
 
@@ -147,7 +151,10 @@ exports.markAsRead = async (req, res) => {
 // Marcar todas como leídas (solo del usuario)
 exports.markAllAsRead = async (req, res) => {
   try {
-    const userObligations = await Obligation.find({ user: req.user._id }).select('_id');
+    const userObligations = await Obligation.find({
+      user: req.user._id,
+      fiscalYear: currentFiscalYear()
+    }).select('_id');
     const obligationIds = userObligations.map(o => o._id);
     await Alert.updateMany(
       { isRead: false, obligation: { $in: obligationIds } },
@@ -175,7 +182,10 @@ exports.delete = async (req, res) => {
 // Obtener resumen de alertas del usuario
 exports.getSummary = async (req, res) => {
   try {
-    const userObligations = await Obligation.find({ user: req.user._id }).select('_id');
+    const userObligations = await Obligation.find({
+      user: req.user._id,
+      fiscalYear: currentFiscalYear()
+    }).select('_id');
     const obligationIds = userObligations.map(o => o._id);
     const base = { obligation: { $in: obligationIds } };
 
@@ -200,6 +210,13 @@ exports.getSummary = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+function currentFiscalYear(date = new Date()) {
+  return Number(new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'America/Havana',
+    year: 'numeric'
+  }).format(date));
+}
 
 function formatDate(date) {
   return new Date(date).toLocaleDateString('es-ES', {
@@ -250,6 +267,7 @@ async function runTelegramReminders() {
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const fiscalYear = currentFiscalYear(today);
   const remindDays = new Set([7, 3, 1]);
 
   const users = await User.find({
@@ -265,10 +283,11 @@ async function runTelegramReminders() {
       const [obligations, incomes] = await Promise.all([
         Obligation.find({
           user: user._id,
+          fiscalYear,
           status: { $nin: ['pagado', 'paid'] },
           dueDate: { $exists: true, $ne: null }
         }).sort({ dueDate: 1 }),
-        Income.find({ user: user._id })
+        Income.find({ user: user._id, year: fiscalYear })
       ]);
 
       const incomeByYear = {};
@@ -332,10 +351,10 @@ async function runTelegramReminders() {
         });
 
         const message =
-          `🔔 <b>Recordatorio MiONAT</b>\n` +
+          `🔔 <b>Recordatorio MiONAT ${fiscalYear}</b>\n` +
           `Hola ${user.name || ''},\n\n` +
           lines.join('\n\n') +
-          `\n\n<b>TOTALES</b>\n` +
+          `\n\n<b>TOTALES ${fiscalYear}</b>\n` +
           totalsByCode.join('\n') +
           `\nPrincipal: $${formatMoney(sumPrincipal)}` +
           `\nMora: $${formatMoney(sumMora)}` +
