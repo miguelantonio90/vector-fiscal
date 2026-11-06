@@ -294,7 +294,7 @@
                 <th class="py-3 px-2 text-left text-slate-400 print:text-gray-600 font-medium">Descripción</th>
                 <th class="py-3 px-2 text-left text-slate-400 print:text-gray-600 font-medium">Período</th>
                 <th class="py-3 px-2 text-center text-slate-400 print:text-gray-600 font-medium">Vencimiento</th>
-                <th class="py-3 px-2 text-right text-slate-400 print:text-gray-600 font-medium">Monto Est.</th>
+                <th class="py-3 px-2 text-right text-slate-400 print:text-gray-600 font-medium">Monto</th>
                 <th class="py-3 px-2 text-center text-slate-400 print:text-gray-600 font-medium">Estado</th>
               </tr>
             </thead>
@@ -310,7 +310,10 @@
                 <td class="py-2 px-2 text-center text-white print:text-black">{{ formatDateShort(obligation.dueDate) }}</td>
                 <td class="py-2 px-2 text-right font-mono text-amber-400 print:text-amber-700">
                   {{ formatCurrencyPrint(getObligationAmount(obligation)) }}
-                  <span v-if="!obligation.amount && obligation.tributeCode === '0114022'" class="text-xs text-slate-500">*</span>
+                  <span v-if="getMora(obligation) > 0" class="block text-xs text-red-400 print:text-red-700 font-normal">
+                    incl. mora {{ formatCurrencyPrint(getMora(obligation)) }}
+                  </span>
+                  <span v-if="isEstimatedAmount(obligation)" class="text-xs text-slate-500">*</span>
                 </td>
                 <td class="py-2 px-2 text-center">
                   <span 
@@ -331,13 +334,13 @@
               <tr class="bg-slate-800/50 print:bg-gray-100 font-bold">
                 <td colspan="4" class="py-3 px-2 text-white print:text-black">TOTAL A DEPOSITAR</td>
                 <td class="py-3 px-2 text-right font-mono text-amber-400 print:text-amber-700 text-lg">
-                  {{ formatCurrencyPrint(totalADepositar) }}
+                  {{ formatCurrencyPrint(pendingTotal) }}
                 </td>
                 <td class="py-3 px-2"></td>
               </tr>
             </tfoot>
           </table>
-          <p v-if="pendingObligations.some(o => !o.amount && o.tributeCode === '0114022')" class="text-xs text-slate-500 print:text-gray-500 mt-2">
+          <p v-if="pendingObligations.some(isEstimatedAmount)" class="text-xs text-slate-500 print:text-gray-500 mt-2">
             * Monto estimado basado en el promedio de pagos mensuales anteriores
           </p>
         </div>
@@ -703,6 +706,7 @@ import { usePageLoading } from '../composables/pageLoading'
 import * as XLSX from 'xlsx'
 import { obligationsApi, paymentsApi, incomesApi, predictionsApi } from '../services/api'
 import { useDepositTotals } from '../composables/useDepositTotals'
+import { calculateLateFee } from '../utils/businessDays'
 
 const selectedYear = ref(new Date().getFullYear())
 const yearOptions = [new Date().getFullYear() - 2, new Date().getFullYear() - 1, new Date().getFullYear()]
@@ -740,8 +744,12 @@ const currentDate = computed(() => {
 
 const pendingObligations = computed(() => {
   return allObligations.value
-    .filter(o => o.status === 'pendiente')
+    .filter(o => o.status === 'pendiente' || o.status === 'vencido')
     .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
+})
+
+const pendingTotal = computed(() => {
+  return Math.round(pendingObligations.value.reduce((sum, o) => sum + getObligationAmount(o), 0) * 100) / 100
 })
 
 const pendingAmount = computed(() => {
@@ -901,14 +909,53 @@ function getDaysText(obligation) {
   return `${days} días`
 }
 
-function getObligationAmount(obligation) {
-  if (obligation.amount && obligation.amount > 0) {
-    return obligation.amount
+function monthFromPeriod(period) {
+  const names = { enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6, julio: 7, agosto: 8, septiembre: 9, octubre: 10, noviembre: 11, diciembre: 12 }
+  const text = String(period || '').toLowerCase()
+  for (const [name, num] of Object.entries(names)) {
+    if (text.startsWith(name + ':')) return num
   }
+  return null
+}
+
+function incomeForObligation(obligation) {
+  const month = monthFromPeriod(obligation.period)
+  if (!month) return 0
+  const income = ingresos.value.find(i => i.month === month)
+  return income?.amount || income?.grossIncome || 0
+}
+
+function isEstimatedAmount(obligation) {
+  if (obligation.tributeCode !== '0114022') return false
+  if (incomeForObligation(obligation) > 0) return false
+  return !(obligation.amount > 0)
+}
+
+function getPrincipal(obligation) {
+  if (obligation.tributeCode === '0820132') {
+    return obligation.amount > 0 ? obligation.amount : 1200
+  }
+  const gross = incomeForObligation(obligation)
+  if (gross > 0) {
+    if (obligation.tributeCode === '0114022') return Math.round(gross * 0.10 * 100) / 100
+    if (obligation.tributeCode === '0510122') {
+      if (gross <= 3260) return 0
+      return Math.round((gross - 3260) * 0.05 * 100) / 100
+    }
+  }
+  if (obligation.amount > 0) return obligation.amount
   if (obligation.tributeCode === '0114022' && obligationsSummary.value.avgMonthlyPayment) {
     return obligationsSummary.value.avgMonthlyPayment
   }
   return 0
+}
+
+function getMora(obligation) {
+  return calculateLateFee(getPrincipal(obligation), obligation.dueDate)?.amount || 0
+}
+
+function getObligationAmount(obligation) {
+  return Math.round((getPrincipal(obligation) + getMora(obligation)) * 100) / 100
 }
 
 function printReport() {
