@@ -84,13 +84,20 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 MiONAT API corriendo en puerto ${PORT}`);
   console.log(`📊 Entorno: ${process.env.NODE_ENV || 'development'}`);
 
-  // En desarrollo: escuchar mensajes del bot por long polling
-  if (process.env.NODE_ENV !== 'production' || process.env.TELEGRAM_POLLING === '1') {
-    try {
-      require('./services/telegramBot').startPolling();
-    } catch (err) {
-      console.warn('[telegram] No se pudo iniciar polling:', err.message);
-    }
+  const telegram = require('./services/telegramBot');
+  if (process.env.NODE_ENV === 'production' && telegram.getToken()) {
+    const base = (process.env.TELEGRAM_WEBHOOK_BASE || 'https://mionat-api.onrender.com').replace(/\/$/, '');
+    telegram.setWebhook(
+      `${base}/api/telegram/webhook`,
+      process.env.TELEGRAM_WEBHOOK_SECRET || undefined
+    ).then(() => {
+      console.log('[telegram] Webhook registrado en', `${base}/api/telegram/webhook`);
+    }).catch((err) => {
+      console.warn('[telegram] No se pudo registrar webhook:', err.message);
+    });
+    require('./controllers/alertsController').startReminderScheduler();
+  } else if (process.env.TELEGRAM_POLLING === '1') {
+    telegram.startPolling();
   }
 });
 

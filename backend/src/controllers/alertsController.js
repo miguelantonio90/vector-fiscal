@@ -235,38 +235,31 @@ async function sendTelegramMessage(token, chatId, text) {
   return res.json();
 }
 
-// POST /api/alerts/telegram-remind — cron con x-cron-secret
-exports.telegramRemind = async (req, res) => {
-  try {
-    const secret = req.headers['x-cron-secret'];
-    if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
-      return res.status(401).json({ error: 'No autorizado' });
-    }
+async function runTelegramReminders() {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) {
+    throw new Error('TELEGRAM_BOT_TOKEN no configurado');
+  }
 
-    const token = process.env.TELEGRAM_BOT_TOKEN;
-    if (!token) {
-      return res.status(500).json({ error: 'TELEGRAM_BOT_TOKEN no configurado' });
-    }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const remindDays = new Set([7, 3, 1]);
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const remindDays = new Set([7, 3, 1]);
+  const users = await User.find({
+    telegramChatId: { $exists: true, $nin: [null, ''] }
+  }).select('_id name telegramChatId');
 
-    const users = await User.find({
-      telegramChatId: { $exists: true, $nin: [null, ''] }
-    }).select('_id name telegramChatId');
+  let sent = 0;
+  let skipped = 0;
+  const errors = [];
 
-    let sent = 0;
-    let skipped = 0;
-    const errors = [];
-
-    for (const user of users) {
-      try {
-        const obligations = await Obligation.find({
-          user: user._id,
-          status: { $ne: 'paid' },
-          dueDate: { $exists: true, $ne: null }
-        }).sort({ dueDate: 1 });
+  for (const user of users) {
+    try {
+      const obligations = await Obligation.find({
+        user: user._id,
+        status: { $nin: ['pagado', 'paid'] },
+        dueDate: { $exists: true, $ne: null }
+      }).sort({ dueDate: 1 });
 
         const lines = [];
         for (const obl of obligations) {
@@ -302,21 +295,57 @@ exports.telegramRemind = async (req, res) => {
           `Hola ${user.name || ''},\n\n` +
           lines.join('\n\n');
 
-        await sendTelegramMessage(token, user.telegramChatId, message);
-        sent += 1;
-      } catch (err) {
-        errors.push({ userId: String(user._id), error: err.message });
-      }
+      await sendTelegramMessage(token, user.telegramChatId, message);
+      sent += 1;
+    } catch (err) {
+      errors.push({ userId: String(user._id), error: err.message });
     }
+  }
 
-    res.json({
-      message: 'Recordatorios procesados',
-      users: users.length,
-      sent,
-      skipped,
-      errors
-    });
+  return {
+    message: 'Recordatorios procesados',
+    users: users.length,
+    sent,
+    skipped,
+    errors
+  };
+}
+
+exports.runTelegramReminders = runTelegramReminders;
+
+// POST /api/alerts/telegram-remind — protegido por x-cron-secret
+exports.telegramRemind = async (req, res) => {
+  try {
+    const secret = req.headers['x-cron-secret'];
+    if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+      return res.status(401).json({ error: 'No autorizado' });
+    }
+    const result = await runTelegramReminders();
+    res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
+
+let lastReminderDay = '';
+
+function startReminderScheduler() {
+  const tick = async () => {
+    const now = new Date();
+    // 13:00 UTC ≈ 08:00 Cuba
+    const dayKey = now.toISOString().slice(0, 10);
+    if (now.getUTCHours() !== 13 || lastReminderDay === dayKey) return;
+    lastReminderDay = dayKey;
+    try {
+      const result = await runTelegramReminders();
+      console.log('[telegram] recordatorio diario', result);
+    } catch (err) {
+      lastReminderDay = '';
+      console.error('[telegram] recordatorio diario:', err.message);
+    }
+  };
+  setInterval(tick, 15 * 60 * 1000);
+  setTimeout(tick, 20 * 1000);
+}
+
+exports.startReminderScheduler = startReminderScheduler;
