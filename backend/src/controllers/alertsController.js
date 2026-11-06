@@ -279,6 +279,9 @@ async function runTelegramReminders() {
       }
 
         const lines = [];
+        const byCode = {};
+        let sumPrincipal = 0;
+        let sumMora = 0;
         for (const obl of obligations) {
           const days = daysUntilDue(obl.dueDate, today);
           const overdue = days < 0;
@@ -296,9 +299,16 @@ async function runTelegramReminders() {
               ? 'vence mañana'
               : `vence en ${days} días`;
           const name = TRIBUTE_NAMES[obl.tributeCode] || obl.description || '';
+          const code = obl.tributeCode || '';
+
+          sumPrincipal += principal;
+          sumMora += mora;
+          if (!byCode[code]) byCode[code] = { name, principal: 0, mora: 0 };
+          byCode[code].principal += principal;
+          byCode[code].mora += mora;
 
           lines.push(
-            `• <b>${obl.tributeCode || ''}</b> ${name}\n` +
+            `• <b>${code}</b> ${name}\n` +
             `  ${obl.period || ''}\n` +
             `  ${when} (${formatDate(obl.dueDate)})\n` +
             `  Principal: $${formatMoney(principal)}` +
@@ -312,10 +322,24 @@ async function runTelegramReminders() {
           continue;
         }
 
+        sumPrincipal = Math.round(sumPrincipal * 100) / 100;
+        sumMora = Math.round(sumMora * 100) / 100;
+        const sumTotal = Math.round((sumPrincipal + sumMora) * 100) / 100;
+        const totalsByCode = Object.entries(byCode).map(([code, row]) => {
+          const rowTotal = Math.round((row.principal + row.mora) * 100) / 100;
+          const moraText = row.mora > 0 ? ` (mora $${formatMoney(Math.round(row.mora * 100) / 100)})` : '';
+          return `• ${code} ${row.name}: $${formatMoney(rowTotal)}${moraText}`;
+        });
+
         const message =
           `🔔 <b>Recordatorio MiONAT</b>\n` +
           `Hola ${user.name || ''},\n\n` +
-          lines.join('\n\n');
+          lines.join('\n\n') +
+          `\n\n<b>TOTALES</b>\n` +
+          totalsByCode.join('\n') +
+          `\nPrincipal: $${formatMoney(sumPrincipal)}` +
+          `\nMora: $${formatMoney(sumMora)}` +
+          `\n<b>Total a pagar: $${formatMoney(sumTotal)}</b>`;
 
       await sendTelegramMessage(token, user.telegramChatId, message);
       sent += 1;
