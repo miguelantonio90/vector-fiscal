@@ -147,12 +147,13 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { usePageLoading } from '../composables/pageLoading'
 import { obligationsApi } from '../services/api'
 
 const currentYear = new Date().getFullYear()
 const selectedYear = ref(currentYear)
 const yearOptions = [currentYear - 2, currentYear - 1, currentYear]
-const loading = ref(true)
+const loading = usePageLoading('VectorFiscal')
 const data = ref(null)
 
 const currentDate = computed(() => {

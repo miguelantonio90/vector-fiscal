@@ -205,12 +205,22 @@
         </header>
 
         <!-- Page Content -->
-        <div class="p-8 print:p-0">
+        <div class="relative p-8 print:p-0 min-h-[calc(100vh-5.5rem)]">
           <router-view v-slot="{ Component }">
             <transition name="fade" mode="out-in">
               <component :is="Component" />
             </transition>
           </router-view>
+
+          <div
+            v-if="pageLoading"
+            class="absolute inset-0 z-30 flex items-center justify-center bg-slate-950 print:hidden"
+          >
+            <div class="flex flex-col items-center gap-4">
+              <div class="w-12 h-12 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+              <p class="text-slate-200 font-medium">Cargando datos…</p>
+            </div>
+          </div>
         </div>
       </main>
     </template>
@@ -221,6 +231,7 @@
 import { computed, ref, h, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { authApi, obligationsApi } from './services/api'
+import { pageLoading } from './composables/pageLoading'
 
 const route = useRoute()
 const router = useRouter()

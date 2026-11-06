@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import App from './App.vue'
 import './style.css'
+import { markRouteLoading } from './composables/pageLoading'
 
 // Views
 import Dashboard from './views/Dashboard.vue'
@@ -41,6 +42,7 @@ const router = createRouter({
 
 // Navigation guard para proteger rutas
 router.beforeEach((to, from, next) => {
+  markRouteLoading(to.name)
   const token = localStorage.getItem('token')
   const isPublicRoute = to.meta.public
   const isAdminRoute = to.meta.adminOnly

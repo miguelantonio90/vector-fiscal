@@ -699,13 +699,14 @@
 
 <script setup>
 import { ref, computed, onMounted, watch, h } from 'vue'
+import { usePageLoading } from '../composables/pageLoading'
 import * as XLSX from 'xlsx'
 import { obligationsApi, paymentsApi, incomesApi, predictionsApi } from '../services/api'
 import { useDepositTotals } from '../composables/useDepositTotals'
 
 const selectedYear = ref(new Date().getFullYear())
 const yearOptions = [new Date().getFullYear() - 2, new Date().getFullYear() - 1, new Date().getFullYear()]
-const loading = ref(true)
+const loading = usePageLoading('Reports')
 const filterTribute = ref('')
 const filterMethod = ref('')
 const obligationsSummary = ref({ pending: 0, paid: 0, overdue: 0, total: 0, totalAmount: 0, paidAmount: 0, avgMonthlyPayment: 0 })

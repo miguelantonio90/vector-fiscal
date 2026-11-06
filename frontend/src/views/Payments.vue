@@ -720,12 +720,13 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { usePageLoading } from '../composables/pageLoading'
 import { useRoute } from 'vue-router'
 import { paymentsApi, obligationsApi, incomesApi } from '../services/api'
 
 const route = useRoute()
 
-const loading = ref(true)
+const loading = usePageLoading('Payments')
 const submitting = ref(false)
 const showPaymentModal = ref(false)
 const payments = ref([])

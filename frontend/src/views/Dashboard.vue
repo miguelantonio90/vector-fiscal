@@ -407,10 +407,11 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { usePageLoading } from '../composables/pageLoading'
 import { obligationsApi, paymentsApi, predictionsApi, incomesApi } from '../services/api'
 import InsightsPanel from '../components/InsightsPanel.vue'
 
-const loading = ref(true)
+const loading = usePageLoading('Dashboard')
 const allObligations = ref([])
 const incomes = ref([])
 const summary = ref({ pending: 0, paid: 0, overdue: 0, total: 0, totalAmount: 0, paidAmount: 0 })

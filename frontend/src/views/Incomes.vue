@@ -412,10 +412,11 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { usePageLoading } from '../composables/pageLoading'
 import { incomesApi, obligationsApi } from '../services/api'
 
 const currentFiscalYear = new Date().getFullYear()
-const loading = ref(true)
+const loading = usePageLoading('Incomes')
 const saving = ref(false)
 const ingresos = ref([])
 const obligaciones = ref([])

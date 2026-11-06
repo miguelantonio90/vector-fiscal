@@ -365,9 +365,10 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { usePageLoading } from '../composables/pageLoading'
 import { predictionsApi } from '../services/api'
 
-const loading = ref(true)
+const loading = usePageLoading('AnnualDeclaration')
 // Por defecto mostrar el año actual (donde probablemente hay datos)
 const selectedYear = ref(new Date().getFullYear())
 const yearOptions = [new Date().getFullYear() - 2, new Date().getFullYear() - 1, new Date().getFullYear()]

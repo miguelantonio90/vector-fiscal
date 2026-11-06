@@ -216,6 +216,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { usePageLoading } from '../composables/pageLoading'
 import { obligationsApi } from '../services/api'
 
 const currentMonth = ref(new Date().getMonth())
@@ -223,7 +224,7 @@ const currentYear = ref(new Date().getFullYear())
 const yearOptions = [new Date().getFullYear() - 2, new Date().getFullYear() - 1, new Date().getFullYear()]
 const obligations = ref([])
 const selectedObligation = ref(null)
-const loading = ref(true)
+const loading = usePageLoading('Calendar')
 
 const monthNames = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',

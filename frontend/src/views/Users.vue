@@ -395,10 +395,11 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { usePageLoading } from '../composables/pageLoading'
 import { usersApi } from '../services/api'
 
 // Estado
-const loading = ref(true)
+const loading = usePageLoading('Users')
 const users = ref([])
 const stats = ref({})
 const searchQuery = ref('')
