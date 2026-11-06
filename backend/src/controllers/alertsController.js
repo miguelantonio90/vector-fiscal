@@ -327,25 +327,43 @@ exports.telegramRemind = async (req, res) => {
   }
 };
 
-let lastReminderDay = '';
+// Tres avisos al día, hora de Cuba (America/Havana, UTC−5)
+const REMINDER_SLOTS = ['09:00', '12:30', '17:00'];
+const sentSlots = new Set();
+
+function cubaClock(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'America/Havana',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23'
+  }).formatToParts(date);
+  const get = (type) => parts.find((p) => p.type === type).value;
+  return {
+    day: `${get('year')}-${get('month')}-${get('day')}`,
+    hm: `${get('hour')}:${get('minute')}`
+  };
+}
 
 function startReminderScheduler() {
   const tick = async () => {
-    const now = new Date();
-    // 13:00 UTC ≈ 08:00 Cuba
-    const dayKey = now.toISOString().slice(0, 10);
-    if (now.getUTCHours() !== 13 || lastReminderDay === dayKey) return;
-    lastReminderDay = dayKey;
+    const { day, hm } = cubaClock();
+    if (!REMINDER_SLOTS.includes(hm)) return;
+    const key = `${day} ${hm}`;
+    if (sentSlots.has(key)) return;
+    sentSlots.add(key);
     try {
       const result = await runTelegramReminders();
-      console.log('[telegram] recordatorio diario', result);
+      console.log('[telegram] recordatorio', key, result);
     } catch (err) {
-      lastReminderDay = '';
-      console.error('[telegram] recordatorio diario:', err.message);
+      sentSlots.delete(key);
+      console.error('[telegram] recordatorio:', err.message);
     }
   };
-  setInterval(tick, 15 * 60 * 1000);
-  setTimeout(tick, 20 * 1000);
+  setInterval(tick, 30 * 1000);
 }
 
 exports.startReminderScheduler = startReminderScheduler;
