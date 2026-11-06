@@ -47,7 +47,8 @@ export const authApi = {
   register: (data) => api.post('/auth/register', data),
   login: (nit, password) => api.post('/auth/login', { nit, password }),
   me: () => api.get('/auth/me'),
-  updateProfile: (name, nit) => api.put('/auth/profile', { name, nit }),
+  updateProfile: (name, nit, telegramChatId) =>
+    api.put('/auth/profile', { name, nit, telegramChatId }),
   changePassword: (currentPassword, newPassword) => api.put('/auth/password', { currentPassword, newPassword }),
   logout: () => {
     localStorage.removeItem('token')

@@ -16,6 +16,12 @@
           </svg>
           Vector Fiscal
         </router-link>
+        <button @click="exportExcel" class="btn bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Exportar Excel
+        </button>
         <button @click="printReport" class="btn bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -693,6 +699,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch, h } from 'vue'
+import * as XLSX from 'xlsx'
 import { obligationsApi, paymentsApi, incomesApi, predictionsApi } from '../services/api'
 import { useDepositTotals } from '../composables/useDepositTotals'
 
@@ -709,6 +716,7 @@ const allPayments = ref([])
 const allObligations = ref([])
 
 const {
+  ingresos,
   totalIngresos,
   totalADepositar,
   totalMensualesPrincipal,
@@ -904,6 +912,61 @@ function getObligationAmount(obligation) {
 
 function printReport() {
   window.print()
+}
+
+function exportExcel() {
+  const year = selectedYear.value
+  const wb = XLSX.utils.book_new()
+
+  const ingresosRows = [...ingresos.value]
+    .sort((a, b) => (a.month || 0) - (b.month || 0))
+    .map(i => ({
+      Mes: getMonthName(i.month),
+      Bruto: Number(i.amount || i.grossIncome || 0)
+    }))
+  if (ingresosRows.length === 0) {
+    ingresosRows.push({ Mes: '—', Bruto: 0 })
+  }
+  const wsIngresos = XLSX.utils.json_to_sheet(ingresosRows)
+  XLSX.utils.book_append_sheet(wb, wsIngresos, 'Ingresos')
+
+  const pagosRows = [...allPayments.value]
+    .sort((a, b) => new Date(a.paymentDate) - new Date(b.paymentDate))
+    .map(p => ({
+      Fecha: p.paymentDate
+        ? new Date(p.paymentDate).toLocaleDateString('es-CU')
+        : '',
+      Tributo: p.obligation?.tributeCode || '',
+      Período: p.obligation?.period || '',
+      Principal: Number(p.amount || 0),
+      Mora: Number(p.lateSurcharge?.surchargeAmount || 0),
+      Bonificación: Number(p.bonusAmount || 0),
+      Referencia: p.reference || ''
+    }))
+  if (pagosRows.length === 0) {
+    pagosRows.push({
+      Fecha: '—',
+      Tributo: '',
+      Período: '',
+      Principal: 0,
+      Mora: 0,
+      Bonificación: 0,
+      Referencia: ''
+    })
+  }
+  const wsPagos = XLSX.utils.json_to_sheet(pagosRows)
+  XLSX.utils.book_append_sheet(wb, wsPagos, 'Pagos')
+
+  const depositRows = [
+    { Concepto: 'Impuestos mensuales', Monto: Number(totalMensualesPrincipal.value || 0) },
+    { Concepto: 'Trimestrales 0820132', Monto: Number(totalTrimestralPrincipal.value || 0) },
+    { Concepto: 'Mora', Monto: Number(totalMora.value || 0) },
+    { Concepto: 'Total a depositar', Monto: Number(totalADepositar.value || 0) }
+  ]
+  const wsDeposit = XLSX.utils.json_to_sheet(depositRows)
+  XLSX.utils.book_append_sheet(wb, wsDeposit, 'A depositar')
+
+  XLSX.writeFile(wb, `reporte-mionat-${year}.xlsx`)
 }
 
 async function loadData() {

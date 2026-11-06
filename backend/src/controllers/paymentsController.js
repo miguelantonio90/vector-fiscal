@@ -1,6 +1,40 @@
 const { Payment, Obligation } = require('../models');
 const { calculateLateSurcharge } = require('../utils/lateSurcharge');
 
+function parseConfirmationImage(input) {
+  if (!input || typeof input !== 'string') return null;
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  let contentType = 'image/jpeg';
+  let base64 = trimmed;
+  const dataUrlMatch = trimmed.match(/^data:([^;]+);base64,(.+)$/s);
+  if (dataUrlMatch) {
+    contentType = dataUrlMatch[1];
+    base64 = dataUrlMatch[2];
+  }
+
+  return {
+    data: Buffer.from(base64, 'base64'),
+    contentType,
+    filename: 'confirmacion-banco'
+  };
+}
+
+function serializePayment(payment, { includeImage = false } = {}) {
+  const obj = payment.toObject ? payment.toObject() : { ...payment };
+  const img = obj.confirmationImage;
+  const hasImageData = !!(img && img.data);
+  obj.hasConfirmationImage = !!(hasImageData || (img && (img.filename || img.contentType)));
+  if (includeImage && hasImageData) {
+    const buf = Buffer.isBuffer(img.data) ? img.data : Buffer.from(img.data);
+    obj.confirmationImageBase64 =
+      `data:${img.contentType || 'image/jpeg'};base64,` + buf.toString('base64');
+  }
+  delete obj.confirmationImage;
+  return obj;
+}
+
 // Obtener todos los pagos del usuario actual
 exports.getAll = async (req, res) => {
   try {
@@ -15,6 +49,7 @@ exports.getAll = async (req, res) => {
     if (paymentMethod) filter.paymentMethod = paymentMethod;
     
     let payments = await Payment.find(filter)
+      .select('-confirmationImage.data')
       .populate('obligation')
       .sort({ paymentDate: -1 });
     
@@ -22,8 +57,8 @@ exports.getAll = async (req, res) => {
       const y = parseInt(year);
       payments = payments.filter(p => p.obligation?.fiscalYear === y);
     }
-    
-    res.json(payments);
+
+    res.json(payments.map(p => serializePayment(p)));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -39,7 +74,7 @@ exports.getById = async (req, res) => {
     if (!payment) {
       return res.status(404).json({ error: 'Pago no encontrado' });
     }
-    res.json(payment);
+    res.json(serializePayment(payment, { includeImage: true }));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -48,7 +83,19 @@ exports.getById = async (req, res) => {
 // Registrar nuevo pago para el usuario actual
 exports.create = async (req, res) => {
   try {
-    const { obligationId, amount, principalAmount: clientPrincipal, paymentDate, paymentMethod, reference, notes, bonusMode, bonusAmountSaved } = req.body;
+    const {
+      obligationId,
+      amount,
+      principalAmount: clientPrincipal,
+      paymentDate,
+      paymentMethod,
+      reference,
+      notes,
+      bonusMode,
+      bonusAmountSaved,
+      confirmationText,
+      confirmationImageBase64
+    } = req.body;
     
     const obligation = await Obligation.findOne({
       _id: obligationId,
@@ -90,17 +137,23 @@ exports.create = async (req, res) => {
       bonusAmount,
       lateSurcharge: surcharge || { lateDays: 0, surchargeRate: 0, surchargeAmount: 0, description: '' },
       reference,
-      notes
+      notes,
+      confirmationText: confirmationText || ''
     });
+
+    const image = parseConfirmationImage(confirmationImageBase64);
+    if (image) payment.confirmationImage = image;
     
     await payment.save();
     
     obligation.status = 'pagado';
     obligation.amount = principal;
     await obligation.save();
+
+    const saved = await Payment.findById(payment._id).populate('obligation');
     
     res.status(201).json({
-      payment,
+      payment: serializePayment(saved, { includeImage: true }),
       totalPaid: amount,
       bonusInfo: {
         principal,
@@ -118,7 +171,17 @@ exports.create = async (req, res) => {
 // Actualizar pago (verificando que pertenece al usuario)
 exports.update = async (req, res) => {
   try {
-    const { amount, paymentDate, paymentMethod, reference, notes, bonusMode, bonusAmountSaved } = req.body;
+    const {
+      amount,
+      paymentDate,
+      paymentMethod,
+      reference,
+      notes,
+      bonusMode,
+      bonusAmountSaved,
+      confirmationText,
+      confirmationImageBase64
+    } = req.body;
     
     const payment = await Payment.findOne({
       _id: req.params.id,
@@ -161,6 +224,11 @@ exports.update = async (req, res) => {
     payment.lateSurcharge = surcharge || { lateDays: 0, surchargeRate: 0, surchargeAmount: 0, description: '' };
     payment.reference = reference;
     payment.notes = notes;
+    if (confirmationText !== undefined) {
+      payment.confirmationText = confirmationText || '';
+    }
+    const image = parseConfirmationImage(confirmationImageBase64);
+    if (image) payment.confirmationImage = image;
     
     await payment.save();
     
@@ -172,7 +240,7 @@ exports.update = async (req, res) => {
     // Devolver el pago con la obligación populada
     const updatedPayment = await Payment.findById(payment._id).populate('obligation');
     
-    res.json(updatedPayment);
+    res.json(serializePayment(updatedPayment, { includeImage: true }));
   } catch (error) {
     console.error('Error updating payment:', error);
     res.status(400).json({ error: error.message });

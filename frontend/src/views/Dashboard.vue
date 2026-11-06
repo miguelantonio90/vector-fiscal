@@ -173,6 +173,50 @@
       </div>
     </div>
 
+    <!-- Esta semana -->
+    <div v-if="!loading" class="card border border-amber-700/30 bg-gradient-to-br from-amber-900/10 to-slate-800/50">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="text-lg font-display font-bold text-white">Esta semana</h3>
+          <p class="text-sm text-slate-400">Obligaciones que vencen de lunes a domingo</p>
+        </div>
+        <div v-if="thisWeekObligations.length > 0" class="text-right">
+          <p class="text-xs text-slate-400">VENCEN ESTA SEMANA</p>
+          <p class="text-2xl font-display font-bold text-amber-400 font-mono">{{ thisWeekObligations.length }}</p>
+        </div>
+      </div>
+
+      <div v-if="thisWeekObligations.length === 0" class="text-center py-6">
+        <p class="text-slate-400">Nada vence esta semana</p>
+      </div>
+
+      <div v-else class="space-y-2">
+        <div
+          v-for="row in thisWeekObligations"
+          :key="row._id"
+          class="flex items-center gap-3 p-3 rounded-xl bg-slate-900/40 border border-amber-800/30"
+        >
+          <div class="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+            <span class="text-sm font-bold text-amber-400">{{ row.tributeCode === '0820132' ? 'T' : 'M' }}</span>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-white font-medium text-sm truncate">{{ row.description }}</p>
+            <p class="text-xs text-slate-400">{{ row.period }} · {{ formatShortDate(row.dueDate) }}</p>
+          </div>
+          <div class="text-right flex-shrink-0">
+            <p class="text-white font-mono font-bold">{{ formatCurrency(row.total) }}</p>
+            <p v-if="row.mora > 0" class="text-xs text-red-300/80">incl. mora</p>
+          </div>
+          <router-link
+            :to="`/payments?obligationId=${row._id}`"
+            class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg transition-colors flex-shrink-0"
+          >
+            Pagar
+          </router-link>
+        </div>
+      </div>
+    </div>
+
     <!-- Main Content -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <!-- Pending Obligations -->
@@ -518,6 +562,47 @@ const overduePlanTotal = computed(() => {
   if (!overduePlan.value.length) return 0
   return overduePlan.value[overduePlan.value.length - 1].runningTotal
 })
+
+function getWeekBounds(date = new Date()) {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  const day = d.getDay() // 0 domingo … 6 sábado
+  const mondayOffset = day === 0 ? -6 : 1 - day
+  const monday = new Date(d)
+  monday.setDate(d.getDate() + mondayOffset)
+  monday.setHours(0, 0, 0, 0)
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+  sunday.setHours(23, 59, 59, 999)
+  return { monday, sunday }
+}
+
+const thisWeekObligations = computed(() => {
+  const { monday, sunday } = getWeekBounds()
+  return pendingObligations.value
+    .filter(o => {
+      if (!o.dueDate) return false
+      const due = new Date(o.dueDate)
+      return due >= monday && due <= sunday
+    })
+    .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
+    .map(o => ({
+      _id: o._id,
+      tributeCode: o.tributeCode,
+      description: o.description,
+      period: o.period,
+      dueDate: o.dueDate,
+      mora: getMora(o),
+      total: getObligationAmount(o)
+    }))
+})
+
+function formatShortDate(date) {
+  return new Date(date).toLocaleDateString('es-CU', {
+    day: 'numeric',
+    month: 'short'
+  })
+}
 
 const nextObligation = computed(() => {
   return pendingObligations.value[0] || null

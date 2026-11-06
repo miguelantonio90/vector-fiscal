@@ -19,7 +19,7 @@ const corsOptions = {
 
 // Middleware
 app.use(cors(corsOptions));
-app.use(express.json());
+app.use(express.json({ limit: '8mb' }));
 
 // Rutas públicas (sin autenticación)
 app.use('/api/auth', require('./routes/auth'));
@@ -53,6 +53,9 @@ app.use('/api/obligations', auth, require('./routes/obligations'));
 app.use('/api/payments', auth, require('./routes/payments'));
 app.use('/api/incomes', auth, require('./routes/incomes'));
 app.use('/api/calculator', auth, require('./routes/calculator'));
+// Cron de Telegram (protegido por x-cron-secret, sin JWT)
+app.post('/api/alerts/telegram-remind', require('./controllers/alertsController').telegramRemind);
+
 app.use('/api/alerts', auth, require('./routes/alerts'));
 app.use('/api/predictions', auth, require('./routes/predictions'));
 

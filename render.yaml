@@ -20,6 +20,10 @@ services:
         value: 30d
       - key: MONGODB_URI
         sync: false
+      - key: CRON_SECRET
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
       - key: FRONTEND_URL
         value: https://mionat-web.onrender.com
 

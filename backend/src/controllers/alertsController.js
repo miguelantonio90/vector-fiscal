@@ -1,5 +1,5 @@
-const { Alert, Obligation, Income } = require('../models');
-const { buildAmountSuffix } = require('../utils/lateSurcharge');
+const { Alert, Obligation, Income, User } = require('../models');
+const { buildAmountSuffix, calculateLateSurcharge } = require('../utils/lateSurcharge');
 
 // Obtener todas las alertas del usuario
 exports.getAll = async (req, res) => {
@@ -200,3 +200,123 @@ function formatDate(date) {
     month: 'short'
   });
 }
+
+function daysUntilDue(dueDate, today) {
+  const due = new Date(dueDate);
+  due.setHours(0, 0, 0, 0);
+  const t = new Date(today);
+  t.setHours(0, 0, 0, 0);
+  return Math.round((due - t) / 86400000);
+}
+
+function formatMoney(n) {
+  return Number(n || 0).toLocaleString('es-CU', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+async function sendTelegramMessage(token, chatId, text) {
+  const url = `https://api.telegram.org/bot${token}/sendMessage`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true
+    })
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Telegram ${res.status}: ${body}`);
+  }
+  return res.json();
+}
+
+// POST /api/alerts/telegram-remind — cron con x-cron-secret
+exports.telegramRemind = async (req, res) => {
+  try {
+    const secret = req.headers['x-cron-secret'];
+    if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+      return res.status(401).json({ error: 'No autorizado' });
+    }
+
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) {
+      return res.status(500).json({ error: 'TELEGRAM_BOT_TOKEN no configurado' });
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const remindDays = new Set([7, 3, 1]);
+
+    const users = await User.find({
+      telegramChatId: { $exists: true, $nin: [null, ''] }
+    }).select('_id name telegramChatId');
+
+    let sent = 0;
+    let skipped = 0;
+    const errors = [];
+
+    for (const user of users) {
+      try {
+        const obligations = await Obligation.find({
+          user: user._id,
+          status: { $ne: 'paid' },
+          dueDate: { $exists: true, $ne: null }
+        }).sort({ dueDate: 1 });
+
+        const lines = [];
+        for (const obl of obligations) {
+          const days = daysUntilDue(obl.dueDate, today);
+          const overdue = days < 0;
+          if (!overdue && !remindDays.has(days)) continue;
+
+          const principal = Number(obl.amount) || 0;
+          const surcharge = calculateLateSurcharge(principal, obl.dueDate, today);
+          const mora = surcharge?.surchargeAmount || 0;
+          const total = principal + mora;
+          const when = overdue
+            ? `VENCIDA hace ${Math.abs(days)} día(s)`
+            : days === 1
+              ? 'vence mañana'
+              : `vence en ${days} días`;
+
+          lines.push(
+            `• <b>${obl.tributeCode || ''}</b> ${obl.period || ''}\n` +
+            `  ${when} (${formatDate(obl.dueDate)})\n` +
+            `  Total: $${formatMoney(total)}` +
+            (mora > 0 ? ` (mora $${formatMoney(mora)})` : '')
+          );
+        }
+
+        if (lines.length === 0) {
+          skipped += 1;
+          continue;
+        }
+
+        const message =
+          `🔔 <b>Recordatorio MiONAT</b>\n` +
+          `Hola ${user.name || ''},\n\n` +
+          lines.join('\n\n');
+
+        await sendTelegramMessage(token, user.telegramChatId, message);
+        sent += 1;
+      } catch (err) {
+        errors.push({ userId: String(user._id), error: err.message });
+      }
+    }
+
+    res.json({
+      message: 'Recordatorios procesados',
+      users: users.length,
+      sent,
+      skipped,
+      errors
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

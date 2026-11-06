@@ -54,6 +54,17 @@ const paymentSchema = new mongoose.Schema({
   // Notas adicionales
   notes: {
     type: String
+  },
+  // Texto crudo del SMS / confirmación del banco
+  confirmationText: {
+    type: String,
+    default: ''
+  },
+  // Captura de pantalla de la confirmación
+  confirmationImage: {
+    data: Buffer,
+    contentType: String,
+    filename: String
   }
 }, {
   timestamps: true

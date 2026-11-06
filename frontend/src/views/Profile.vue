@@ -82,6 +82,21 @@
               <p class="mt-2 text-xs text-slate-500">El NIT es tu identificador único en el sistema</p>
             </div>
 
+            <!-- Telegram Chat ID -->
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-2">Telegram Chat ID</label>
+              <input
+                v-model="editForm.telegramChatId"
+                type="text"
+                class="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                placeholder="Ej: 123456789"
+              />
+              <p class="mt-2 text-xs text-slate-500">
+                Habla con el bot de MiONAT en Telegram y envía <span class="text-slate-300">/start</span>;
+                luego pega aquí tu chat id para recibir recordatorios diarios.
+              </p>
+            </div>
+
             <!-- Save Profile Button -->
             <button
               @click="saveProfile"
@@ -357,7 +372,8 @@ const stats = ref({
 // Edit form
 const editForm = ref({
   name: '',
-  nit: ''
+  nit: '',
+  telegramChatId: ''
 })
 
 // Password form
@@ -409,6 +425,7 @@ const loadProfile = async () => {
     user.value = response.data
     editForm.value.name = response.data.name
     editForm.value.nit = response.data.nit
+    editForm.value.telegramChatId = response.data.telegramChatId || ''
     localStorage.setItem('user', JSON.stringify(response.data))
   } catch (error) {
     const storedUser = localStorage.getItem('user')
@@ -416,6 +433,7 @@ const loadProfile = async () => {
       user.value = JSON.parse(storedUser)
       editForm.value.name = user.value.name
       editForm.value.nit = user.value.nit
+      editForm.value.telegramChatId = user.value.telegramChatId || ''
     }
   }
 }
@@ -448,7 +466,11 @@ const saveProfile = async () => {
   
   savingProfile.value = true
   try {
-    const response = await authApi.updateProfile(editForm.value.name, editForm.value.nit)
+    const response = await authApi.updateProfile(
+      editForm.value.name,
+      editForm.value.nit,
+      editForm.value.telegramChatId
+    )
     user.value = response.data.user
     localStorage.setItem('user', JSON.stringify(response.data.user))
     successMessage.value = 'Perfil actualizado exitosamente'

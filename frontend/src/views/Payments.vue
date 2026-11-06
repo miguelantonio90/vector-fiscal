@@ -286,6 +286,47 @@
         </div>
 
         <form @submit.prevent="submitPayment" class="space-y-6">
+          <!-- Pegar confirmación del banco -->
+          <div class="p-4 bg-gradient-to-r from-blue-900/20 to-slate-800/30 rounded-xl border border-blue-700/30 space-y-3">
+            <div class="flex items-center gap-2">
+              <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+              <span class="text-sm font-medium text-blue-300">Pegar confirmación del banco</span>
+            </div>
+            <textarea
+              v-model="bankSmsText"
+              @paste="onBankSmsPaste"
+              class="input resize-none font-mono text-xs"
+              rows="5"
+              placeholder="Pega aquí el SMS de Banco Metropolitano (NIT, Párrafo, Monto, Transacción, Fecha, Bonificaciones)…"
+            ></textarea>
+            <div class="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                @click="applyBankSms"
+                class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors"
+              >
+                Rellenar desde SMS
+              </button>
+              <label class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium rounded-lg transition-colors cursor-pointer">
+                Subir captura
+                <input type="file" accept="image/*" class="hidden" @change="onConfirmationImageChange" />
+              </label>
+              <span v-if="smsParseMessage" class="text-xs" :class="smsParseOk ? 'text-emerald-400' : 'text-amber-400'">
+                {{ smsParseMessage }}
+              </span>
+            </div>
+            <div v-if="confirmationImagePreview" class="relative inline-block">
+              <img :src="confirmationImagePreview" alt="Captura" class="max-h-32 rounded-lg border border-slate-600" />
+              <button
+                type="button"
+                @click="clearConfirmationImage"
+                class="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-600 text-white text-xs"
+              >×</button>
+            </div>
+          </div>
+
           <!-- Obligation Select -->
           <div>
             <label class="block text-sm font-medium text-slate-300 mb-2">
@@ -643,12 +684,20 @@
           </div>
 
           <div v-if="receiptPayment.reference" class="text-sm">
-            <p class="text-slate-400 print:text-gray-600">Referencia</p>
+            <p class="text-slate-400 print:text-gray-600">Nro. Transacción</p>
             <p class="font-mono print:text-black">{{ receiptPayment.reference }}</p>
           </div>
           <div v-if="receiptPayment.notes" class="text-sm">
             <p class="text-slate-400 print:text-gray-600">Notas</p>
             <p class="print:text-black">{{ receiptPayment.notes }}</p>
+          </div>
+          <div v-if="receiptPayment.confirmationImageBase64" class="text-sm space-y-2">
+            <p class="text-slate-400 print:text-gray-600">Captura de confirmación</p>
+            <img
+              :src="receiptPayment.confirmationImageBase64"
+              alt="Confirmación banco"
+              class="max-w-full rounded-lg border border-slate-600 print:border-gray-300"
+            />
           </div>
 
           <p class="text-xs text-slate-500 print:text-gray-500 pt-4 border-t border-slate-700 print:border-gray-300">
@@ -724,8 +773,15 @@ const paymentForm = ref({
   reference: '',
   notes: '',
   bonusMode: 'already', // 'none', 'already', 'calculate'
-  bonusAmountSaved: 0
+  bonusAmountSaved: 0,
+  confirmationText: '',
+  confirmationImageBase64: ''
 })
+
+const bankSmsText = ref('')
+const smsParseMessage = ref('')
+const smsParseOk = ref(false)
+const confirmationImagePreview = ref('')
 
 const isEditing = computed(() => !!editingPaymentId.value)
 
@@ -969,8 +1025,112 @@ function formatDateShort(date) {
   })
 }
 
-function openReceipt(payment) {
+async function openReceipt(payment) {
   receiptPayment.value = payment
+  try {
+    const res = await paymentsApi.getById(payment._id)
+    receiptPayment.value = res.data
+  } catch (error) {
+    console.error('Error loading receipt:', error)
+  }
+}
+
+function parseBankSms(text) {
+  if (!text || !String(text).trim()) return null
+  const src = String(text)
+
+  const reference = src.match(/Nro\.?\s*Transacci[oó]n:\s*(\S+)/i)?.[1] || ''
+  const amountRaw = src.match(/Monto\s+Pagado:\s*([\d.,]+)/i)?.[1]
+  const dateRaw = src.match(/Fecha:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i)?.[1]
+  const paragraph = src.match(/PARRAFO:\s*(\d+)/i)?.[1] || ''
+  const bonusCanal = parseFloat(
+    (src.match(/Bonificaci[oó]n\s+por\s+canal\s+electr[oó]nico:\s*([\d.,]+)/i)?.[1] || '0').replace(',', '.')
+  ) || 0
+  const bonusAdelantado = parseFloat(
+    (src.match(/Bonificaci[oó]n\s+por\s+pago\s+adelantado:\s*([\d.,]+)/i)?.[1] || '0').replace(',', '.')
+  ) || 0
+
+  let amount = null
+  if (amountRaw) {
+    amount = parseFloat(amountRaw.replace(',', '.'))
+  }
+
+  let paymentDate = ''
+  if (dateRaw) {
+    const [d, m, y] = dateRaw.split('/')
+    paymentDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+  }
+
+  return {
+    reference,
+    amount,
+    paymentDate,
+    paragraph,
+    bonusAmount: Math.round((bonusCanal + bonusAdelantado) * 100) / 100
+  }
+}
+
+function applyBankSms() {
+  const parsed = parseBankSms(bankSmsText.value)
+  if (!parsed) {
+    smsParseOk.value = false
+    smsParseMessage.value = 'Pega el texto del SMS primero'
+    return
+  }
+
+  paymentForm.value.confirmationText = bankSmsText.value.trim()
+  paymentForm.value.paymentMethod = 'transfermovil'
+
+  if (parsed.reference) paymentForm.value.reference = parsed.reference
+  if (parsed.amount != null && !Number.isNaN(parsed.amount)) {
+    paymentForm.value.amount = parsed.amount
+  }
+  if (parsed.paymentDate) paymentForm.value.paymentDate = parsed.paymentDate
+
+  if (parsed.bonusAmount > 0) {
+    paymentForm.value.bonusMode = 'already'
+    paymentForm.value.bonusAmountSaved = parsed.bonusAmount
+  }
+
+  let matched = false
+  if (parsed.paragraph) {
+    const obl = availableObligations.value.find(
+      o => String(o.tributeCode) === String(parsed.paragraph)
+    )
+    if (obl) {
+      paymentForm.value.obligationId = obl._id
+      matched = true
+    }
+  }
+
+  smsParseOk.value = true
+  smsParseMessage.value = matched
+    ? `Datos rellenados · obligación ${parsed.paragraph}`
+    : parsed.paragraph
+      ? `Datos rellenados · no hay pendiente con párrafo ${parsed.paragraph}`
+      : 'Datos rellenados'
+}
+
+function onBankSmsPaste() {
+  setTimeout(() => applyBankSms(), 0)
+}
+
+function onConfirmationImageChange(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    const dataUrl = String(reader.result || '')
+    confirmationImagePreview.value = dataUrl
+    paymentForm.value.confirmationImageBase64 = dataUrl
+  }
+  reader.readAsDataURL(file)
+  event.target.value = ''
+}
+
+function clearConfirmationImage() {
+  confirmationImagePreview.value = ''
+  paymentForm.value.confirmationImageBase64 = ''
 }
 
 function printReceipt() {
@@ -1015,6 +1175,10 @@ function showToast(message, type = 'success') {
 function closeModal() {
   showPaymentModal.value = false
   editingPaymentId.value = null
+  bankSmsText.value = ''
+  smsParseMessage.value = ''
+  smsParseOk.value = false
+  confirmationImagePreview.value = ''
   paymentForm.value = {
     obligationId: '',
     amount: null,
@@ -1023,7 +1187,9 @@ function closeModal() {
     reference: '',
     notes: '',
     bonusMode: 'already',
-    bonusAmountSaved: 0
+    bonusAmountSaved: 0,
+    confirmationText: '',
+    confirmationImageBase64: ''
   }
 }
 
@@ -1035,6 +1201,8 @@ function editPayment(payment) {
     bonusMode = 'already'
   }
   
+  bankSmsText.value = payment.confirmationText || ''
+  confirmationImagePreview.value = payment.confirmationImageBase64 || ''
   paymentForm.value = {
     obligationId: payment.obligation?._id || payment.obligation,
     amount: payment.amount,
@@ -1043,7 +1211,9 @@ function editPayment(payment) {
     reference: payment.reference || '',
     notes: payment.notes || '',
     bonusMode: bonusMode,
-    bonusAmountSaved: payment.bonusAmount || 0
+    bonusAmountSaved: payment.bonusAmount || 0,
+    confirmationText: payment.confirmationText || '',
+    confirmationImageBase64: payment.confirmationImageBase64 || ''
   }
   showPaymentModal.value = true
 }
@@ -1095,7 +1265,9 @@ async function submitPayment() {
       reference: paymentForm.value.reference,
       notes: paymentForm.value.notes,
       bonusMode: paymentForm.value.bonusMode,
-      bonusAmountSaved: paymentForm.value.bonusAmountSaved
+      bonusAmountSaved: paymentForm.value.bonusAmountSaved,
+      confirmationText: paymentForm.value.confirmationText || bankSmsText.value.trim(),
+      confirmationImageBase64: paymentForm.value.confirmationImageBase64 || undefined
     }
     
     if (isEditing.value) {

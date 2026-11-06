@@ -90,6 +90,7 @@ router.get('/me', auth, async (req, res) => {
       nit: req.user.nit,
       name: req.user.name,
       role: req.user.role,
+      telegramChatId: req.user.telegramChatId || '',
       createdAt: req.user.createdAt
     };
     if (req.user.vectorFiscal?.filename) {
@@ -105,10 +106,10 @@ router.get('/me', auth, async (req, res) => {
   }
 });
 
-// PUT /api/auth/profile - Actualizar perfil (nombre y NIT)
+// PUT /api/auth/profile - Actualizar perfil (nombre, NIT y Telegram)
 router.put('/profile', auth, async (req, res) => {
   try {
-    const { name, nit } = req.body;
+    const { name, nit, telegramChatId } = req.body;
     const userId = req.user._id;
     
     // Validar campos
@@ -124,10 +125,15 @@ router.put('/profile', auth, async (req, res) => {
       }
     }
     
+    const update = { name, nit };
+    if (telegramChatId !== undefined) {
+      update.telegramChatId = String(telegramChatId || '').trim();
+    }
+
     // Actualizar usuario
     const user = await User.findByIdAndUpdate(
       userId,
-      { name, nit },
+      update,
       { new: true, runValidators: true }
     );
     
@@ -138,6 +144,7 @@ router.put('/profile', auth, async (req, res) => {
         nit: user.nit,
         name: user.name,
         role: user.role,
+        telegramChatId: user.telegramChatId || '',
         createdAt: user.createdAt
       }
     });

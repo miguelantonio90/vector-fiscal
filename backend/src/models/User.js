@@ -27,6 +27,12 @@ const userSchema = new mongoose.Schema({
     enum: ['user', 'admin'],
     default: 'user'
   },
+  // Chat ID de Telegram para recordatorios
+  telegramChatId: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   // Último Vector Fiscal subido
   vectorFiscal: {
     filename: String,
